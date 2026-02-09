@@ -126,6 +126,52 @@ over SSH.
 | SIP MESSAGE (IM) | RFC 3428 | Account.onInstantMessage() |
 | Multicast page send | RTP to multicast addr | Direct socket / pjmedia |
 | PyInstaller binary | Single-file packaging | Build pipeline |
+| SIP dialog viewer | sngrep-style call flow | SIP trace + parser |
+
+### Tier 3 Highlight: SIP Dialog Viewer (sngrep-style)
+
+A built-in SIP message and dialog flow viewer, inspired by `sngrep`.
+Instead of a separate tool, it's integrated right into the phone.
+
+**Dialog List View** — table of active/recent SIP dialogs:
+```
+  Call-ID                          From          To       State     Msgs
+  98asd7f@10.0.0.5                 alice@pbx     100@pbx  Confirmed    8
+  bc3ef21@10.0.0.5                 alice@pbx     201@pbx  Terminated   6
+  sub-44a@10.0.0.5                 alice@pbx     202@pbx  Active(SUB)  4
+```
+
+**Call Flow View** — select a dialog to see the ladder diagram:
+```
+  10.0.0.5:5060                          10.0.0.1:5060
+  (alice)                                (pbx)
+       |                                      |
+       |-------- INVITE sip:100@pbx --------->|
+       |                                      |
+       |<------- 100 Trying ------------------|
+       |<------- 180 Ringing -----------------|
+       |                                      |
+       |<------- 200 OK ----------------------|
+       |-------- ACK ------------------------>|
+       |                                      |
+       |         ** RTP session **            |
+       |                                      |
+       |-------- BYE ------------------------>|
+       |<------- 200 OK ----------------------|
+```
+
+**Message Detail View** — select any arrow to see the full SIP message
+with headers and body, syntax-highlighted.
+
+**Implementation:**
+- Parse all SIP trace events captured by the engine
+- Group by Call-ID into dialogs
+- Track SUBSCRIBE dialogs separately (BLF, MWI, presence)
+- Build ladder diagram from request/response pairs with timestamps
+- Textual `DataTable` for dialog list, `RichLog` for ladder,
+  `ModalScreen` for full message detail
+- Filter by method, Call-ID, URI, or state
+- Export dialog as text or pcap-like format
 
 ## 5. TUI Layout
 
@@ -174,6 +220,9 @@ over SSH.
 | Add BLF | `+` on BLF panel | Enter extension to subscribe |
 | Header Editor | `F3` | Edit SIP header overrides for next request |
 | Call History | tab | DataTable of past calls |
+| SIP Dialogs | tab | sngrep-style dialog list |
+| Call Flow | Enter on dialog | Ladder diagram of selected dialog |
+| Message Detail | Enter on arrow | Full SIP message in modal |
 
 ### Textual Widget Mapping
 
@@ -184,6 +233,9 @@ over SSH.
 | Dial input | `Input` |
 | BLF panel | `DataTable` (ext, state, name) with colored rows |
 | SIP trace log | `RichLog` (scrolling, syntax-highlighted) |
+| Dialog list | `DataTable` (Call-ID, From, To, state, msg count) |
+| Call flow ladder | `Static` or `RichLog` with ASCII ladder diagram |
+| Message detail | `ModalScreen` with syntax-highlighted SIP message |
 | Bottom tabs | `TabbedContent` |
 | Key hints | `Footer` (auto-generated from BINDINGS) |
 | Header editor | `ModalScreen` with `Input` fields |

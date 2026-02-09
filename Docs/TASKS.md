@@ -35,12 +35,21 @@
 - [ ] 4.7 Call history
 - [ ] 4.8 Custom SIP header injection
 
-## Phase 5: Advanced Features
-- [ ] 5.1 TLS/SRTP
-- [ ] 5.2 Presence publish/subscribe
-- [ ] 5.3 Call recording
-- [ ] 5.4 Codec selection/priority UI
-- [ ] 5.5 NAT traversal (STUN/ICE/TURN)
-- [ ] 5.6 DNS SRV/NAPTR
-- [ ] 5.7 Auto-answer with header detection
-- [ ] 5.8 PyInstaller packaging
+## Phase 5: SIP Dialog Viewer (sngrep-style)
+- [ ] 5.1 SIP message parser (extract method, status, Call-ID, From, To, CSeq)
+- [ ] 5.2 Dialog tracker (group messages by Call-ID, track state)
+- [ ] 5.3 Dialog list tab (DataTable: Call-ID, From, To, state, msg count)
+- [ ] 5.4 Call flow ladder diagram (ASCII arrows between endpoints)
+- [ ] 5.5 Message detail modal (full SIP message, syntax-highlighted)
+- [ ] 5.6 Filter/search dialogs (by method, URI, Call-ID, state)
+- [ ] 5.7 Export dialog (text/markdown dump)
+
+## Phase 6: Advanced Features
+- [ ] 6.1 TLS/SRTP
+- [ ] 6.2 Presence publish/subscribe
+- [ ] 6.3 Call recording
+- [ ] 6.4 Codec selection/priority UI
+- [ ] 6.5 NAT traversal (STUN/ICE/TURN)
+- [ ] 6.6 DNS SRV/NAPTR
+- [ ] 6.7 Auto-answer with header detection
+- [ ] 6.8 PyInstaller packaging

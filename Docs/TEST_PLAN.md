@@ -220,6 +220,46 @@ test_trace_captures_invite      - SipTraceEvent captured for INVITE
 test_trace_direction             - Verify send vs recv direction
 ```
 
+## SIP Dialog Viewer Tests
+
+### Unit: SIP Parser
+```
+test_parse_invite_request       - Extract method, uri, headers from INVITE
+test_parse_200_response         - Extract status code, reason, headers
+test_parse_call_id              - Extract Call-ID from any message
+test_parse_cseq                 - Extract CSeq number and method
+test_parse_from_to              - Extract From/To URIs and tags
+test_parse_multiline_header     - Handle folded headers correctly
+test_parse_sdp_body             - Detect and preserve SDP body
+```
+
+### Unit: Dialog Tracker
+```
+test_new_invite_creates_dialog  - First INVITE creates a dialog entry
+test_responses_grouped          - 100/180/200 grouped under same Call-ID
+test_bye_terminates_dialog      - BYE transitions dialog to terminated
+test_subscribe_tracked          - SUBSCRIBE creates separate dialog type
+test_notify_grouped             - NOTIFY grouped with its SUBSCRIBE
+test_dialog_state_machine       - trying→early→confirmed→terminated
+test_multiple_dialogs           - Concurrent dialogs tracked independently
+```
+
+### Unit: Ladder Diagram
+```
+test_ladder_basic_call          - INVITE/200/ACK/BYE renders correct arrows
+test_ladder_direction            - Arrows point correct direction per src/dst
+test_ladder_timestamps          - Timestamps shown on each message
+test_ladder_early_media         - 183 shown between INVITE and 200
+```
+
+### Integration
+```
+test_dialog_viewer_register     - REGISTER dialog captured and displayed
+test_dialog_viewer_call         - Full call flow captured in ladder
+test_dialog_viewer_blf          - SUBSCRIBE/NOTIFY dialog tracked
+test_dialog_viewer_filter       - Filter by INVITE-only shows calls
+```
+
 ## TUI Tests (Textual Pilot)
 
 Textual has a built-in test framework (`app.run_test()`) that simulates
