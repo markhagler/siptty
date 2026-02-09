@@ -1,4 +1,6 @@
-"""SIP engine layer \u2014 wraps pjsua2."""
+"""SIP engine layer — wraps pjsua2."""
+
+from siptty.engine.events import CallStateEvent, RegStateEvent, SipTraceEvent
 
 try:
     import pjsua2 as pj
@@ -7,3 +9,10 @@ try:
 except ImportError:
     pj = None  # type: ignore[assignment]
     PJSUA2_AVAILABLE = False
+
+__all__ = [
+    "PJSUA2_AVAILABLE",
+    "CallStateEvent",
+    "RegStateEvent",
+    "SipTraceEvent",
+]
