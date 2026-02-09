@@ -1,4 +1,4 @@
-# Terminal Phone — Application Design
+# siptty — Application Design
 
 A full-featured SIP softphone with a terminal UI, built for telecom engineers,
 devops, and anyone who needs a Swiss Army knife SIP tool on a headless box or
@@ -179,7 +179,7 @@ with headers and body, syntax-highlighted.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Terminal Phone                                  F1:Help F10:Quit │
+│ siptty                                  F1:Help F10:Quit │
 ├──────────────────┬───────────────────────────────┬──────────────────┤
 │ ACCOUNTS         │ CALL CONTROL                  │ BLF / PRESENCE   │
 │                  │                               │                  │
@@ -201,7 +201,7 @@ with headers and body, syntax-highlighted.
 │ CSeq: 1 INVITE                                                    │
 │ Contact: <sip:alice@10.0.0.5:5060>                                │
 │ Content-Type: application/sdp                                     │
-│ User-Agent: TerminalPhone/0.1                                     │
+│ User-Agent: siptty/0.1                                     │
 │ ...                                                               │
 ├──────────────────────────────────────────────────────────────────────┤
 │ [d]Dial [a]Ans [h]Hang [x]Xfer [c]Conf [m]Mute [p]DTMF [F5]Trace │
@@ -409,9 +409,9 @@ class HeaderPipeline:
 ```toml
 [general]
 log_level = 3                    # 0-6, PJSIP log verbosity
-log_file = "terminal-phone.log"
+log_file = "siptty.log"
 null_audio = false               # true = no sound device (signaling only mode)
-user_agent = "TerminalPhone/0.1"
+user_agent = "siptty/0.1"
 
 [[accounts]]
 name = "alice"
@@ -470,6 +470,6 @@ ring_file = "ring.wav"           # optional custom ring
 
 [history]
 enabled = true
-db_file = "~/.terminal-phone/history.db"
+db_file = "~/.siptty/history.db"
 max_entries = 1000
 ```

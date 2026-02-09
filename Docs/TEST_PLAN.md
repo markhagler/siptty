@@ -1,4 +1,4 @@
-# Terminal Phone — Test Plan
+# siptty — Test Plan
 
 ## Strategy
 

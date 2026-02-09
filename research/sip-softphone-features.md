@@ -1,7 +1,7 @@
 # SIP Softphone Feature Research
 
 Comprehensive feature analysis of major SIP softphone applications.
-Compiled for terminal-phone project reference.
+Compiled for siptty project reference.
 
 ---
 
@@ -733,11 +733,11 @@ Below are other notable SIP clients for competitive reference.
 
 ---
 
-## 6. Consolidated Feature Matrix for terminal-phone Reference
+## 6. Consolidated Feature Matrix for siptty Reference
 
 This section synthesizes ALL features across the above clients into a
 single master list, categorized for use as a reference when building
-terminal-phone.
+siptty.
 
 ### A. SIP Registration & Account Management
 1. SIP REGISTER with digest auth (MD5, SHA-256)
@@ -949,7 +949,7 @@ terminal-phone.
 
 ---
 
-## 7. Key Takeaways for terminal-phone
+## 7. Key Takeaways for siptty
 
 ### Must-Have (Core) Features
 Every serious SIP client implements these:

@@ -1,4 +1,4 @@
-# Terminal Phone - Task List
+# siptty - Task List
 
 ## Phase 1: Design Documents
 - [x] 1.1 Write DESIGN.md Part 1: Overview, goals, tech stack, architecture diagram

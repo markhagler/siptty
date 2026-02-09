@@ -60,7 +60,7 @@ tx_opt.headers.append(hdr)
 
 # User-Agent is set via Endpoint config
 ep_cfg = pj.EpConfig()
-ep_cfg.uaConfig.userAgent = "TerminalPhone/1.0"
+ep_cfg.uaConfig.userAgent = "siptty/1.0"
 
 # Modify From display name
 acc_cfg = pj.AccountConfig()

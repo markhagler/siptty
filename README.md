@@ -1,4 +1,4 @@
-# Terminal Phone
+# siptty
 
 A full-featured SIP softphone with a terminal UI. Built for telecom engineers,
 devops, and anyone who needs a Swiss Army knife SIP tool over SSH or on a
@@ -64,7 +64,7 @@ Think Bria or a Yealink desk phone, but in your terminal.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Terminal Phone                                  F1:Help F10:Quit   │
+│ siptty                                  F1:Help F10:Quit   │
 ├──────────────────┬───────────────────────────────┬──────────────────┤
 │ ACCOUNTS         │ CALL CONTROL                  │ BLF / PRESENCE   │
 │                  │                               │                  │
@@ -81,7 +81,7 @@ Think Bria or a Yealink desk phone, but in your terminal.
 │ Via: SIP/2.0/UDP 10.0.0.5:5060;branch=z9hG4bK-524287-1             │
 │ From: "Alice" <sip:alice@pbx.io>;tag=abc123                        │
 │ To: <sip:100@pbx.io>                                               │
-│ User-Agent: TerminalPhone/0.1                                      │
+│ User-Agent: siptty/0.1                                      │
 ├────────────────────────────────────────────────────────────────────-┤
 │ [d]Dial [a]Ans [h]Hang [x]Xfer [c]Conf [m]Mute [p]DTMF [F5]Trace  │
 └────────────────────────────────────────────────────────────────────-┘
