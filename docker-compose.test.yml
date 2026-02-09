@@ -1,0 +1,16 @@
+services:
+  asterisk:
+    image: andrius/asterisk:latest
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "10000-10100:10000-10100/udp"
+    volumes:
+      - ./tests/asterisk/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./tests/asterisk/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ./tests/asterisk/voicemail.conf:/etc/asterisk/voicemail.conf:ro
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
