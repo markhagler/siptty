@@ -166,14 +166,14 @@ Three parallel tracks after the project skeleton (2.1) is done:
 
 ### 2.5 Docker build environment
 
-- [ ] **2.5.1** Create `Dockerfile` with multi-stage build
+- [x] **2.5.1** Create `Dockerfile` with multi-stage build
   - Stage 1 (builder): python:3.12-bookworm, install SWIG 4.1.x + build deps,
     compile pjsua2 from pjproject source
   - Stage 2 (runtime): python:3.12-slim-bookworm, copy compiled pjsua2,
     install siptty
   - **Done:** `docker build -t siptty .` succeeds; `docker run siptty --help` works
 
-- [ ] **2.5.2** Verify pjsua2 works inside the container
+- [x] **2.5.2** Verify pjsua2 works inside the container
   - Run `scripts/check_pjsua2.py` inside the container
   - **Done:** `docker run siptty python scripts/check_pjsua2.py` prints version
 
@@ -214,25 +214,25 @@ Build order — each group proceeds once dependencies are met:
 Prerequisites for all other Phase 3 work. Not in the original task list but
 essential — the engine needs to boot before it can do anything.
 
-- [ ] **3.0.1** Define event dataclasses in `siptty/engine/events.py`
+- [x] **3.0.1** Define event dataclasses in `siptty/engine/events.py`
   - `RegStateEvent` (account_id, state, reason)
   - `CallStateEvent` (call_id, state, remote_uri, duration, direction)
   - `SipTraceEvent` (direction, message, timestamp)
   - All frozen=True for thread safety
   - **Done:** All three importable with fields matching DESIGN.md
 
-- [ ] **3.0.2** Create `SipEngine` class skeleton with `start()` / `stop()`
+- [x] **3.0.2** Create `SipEngine` class skeleton with `start()` / `stop()`
   - `SipEngine(event_callback)` — callback receives events
   - `start(config)`: creates pjsua2 Endpoint, `libCreate()`, `libInit()`, `libStart()`
   - `stop()`: calls `libDestroy()`
   - **Done:** start → stop cycle completes without crash
 
-- [ ] **3.0.3** Create UDP transport in `start()`
+- [x] **3.0.3** Create UDP transport in `start()`
   - `transportCreate(PJSIP_TRANSPORT_UDP, tp_cfg)` with ephemeral port
   - Store transport ID on engine
   - **Done:** Engine starts with a UDP transport
 
-- [ ] **3.0.4** Audio mode support (null and file)
+- [x] **3.0.4** Audio mode support (null and file)
   - Null mode: `Endpoint.audDevManager().setNullDev()` — signaling only
   - File mode: `AudioMediaPlayer` to play WAV into calls,
     `AudioMediaRecorder` to record received audio to WAV
@@ -240,7 +240,7 @@ essential — the engine needs to boot before it can do anything.
   - All tests use null audio mode
   - **Done:** Engine starts in null or file audio mode without errors
 
-- [ ] **3.0.5** Unit test: engine lifecycle
+- [x] **3.0.5** Unit test: engine lifecycle
   - Start with null_audio=True, stop — no error
   - Double-stop is safe
   - Start with bad config raises cleanly
@@ -250,24 +250,24 @@ essential — the engine needs to boot before it can do anything.
 
 Moved first in implementation order because the engine needs config to start.
 
-- [ ] **3.7.1** Define config dataclasses in `siptty/config/models.py`
+- [x] **3.7.1** Define config dataclasses in `siptty/config/models.py`
   - `AppConfig`, `GeneralConfig`, `AccountConfig`
   - Fields match DESIGN.md §9 TOML schema
   - Sensible defaults for all optional fields
   - **Done:** Dataclasses importable; all fields documented
 
-- [ ] **3.7.2** Config loader: parse TOML into `AppConfig` using `tomllib`
+- [x] **3.7.2** Config loader: parse TOML into `AppConfig` using `tomllib`
   - `load_config(path) -> AppConfig`
   - Raises `ConfigError` with clear message on missing required fields
   - **Done:** Loads a valid TOML config and returns populated dataclass
 
-- [ ] **3.7.3** Config defaults and validation
+- [x] **3.7.3** Config defaults and validation
   - Defaults: log_level=3, null_audio=False, transport="udp", reg_expiry=300
   - Validate transport ∈ {"udp", "tcp", "tls"}, sip_uri starts with `sip:`
   - auth_user defaults to user part of sip_uri if omitted
   - **Done:** All defaults applied; invalid values rejected with clear errors
 
-- [ ] **3.7.4** Unit tests for config loading
+- [x] **3.7.4** Unit tests for config loading
   - Load minimal (one account), load multi-account, defaults applied,
     invalid transport rejected, missing sip_uri raises ConfigError,
     empty file raises ConfigError, BLF + header overrides parsed
@@ -275,30 +275,30 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.1 SIP Registration (Single Account)
 
-- [ ] **3.1.1** Implement `PhoneAccount(pj.Account)` with `onRegState` callback
+- [x] **3.1.1** Implement `PhoneAccount(pj.Account)` with `onRegState` callback
   - Maps `regIsActive`/`regStatus` → state string ("registered", "failed",
     "unregistered")
   - Constructs `RegStateEvent`, posts via `call_from_thread()`
   - **Done:** Callback fires and produces correct event dataclass
 
-- [ ] **3.1.2** Implement `SipEngine.add_account(cfg)`
+- [x] **3.1.2** Implement `SipEngine.add_account(cfg)`
   - Builds `pj.AccountConfig` from `AccountConfig` dataclass
   - Creates `PhoneAccount`, calls `account.create(acc_cfg)`
   - Stores in `_accounts` dict keyed by account name
   - **Done:** Account created and registration initiated
 
-- [ ] **3.1.3** Implement `SipEngine.remove_account(account_id)`
+- [x] **3.1.3** Implement `SipEngine.remove_account(account_id)`
   - Calls `setRegistration(False)` then `shutdown()`
   - Removes from `_accounts`; no-op if not found
   - **Done:** Account unregisters and is cleaned up
 
-- [ ] **3.1.4** TUI account list widget showing registration state
+- [x] **3.1.4** TUI account list widget showing registration state
   - `AccountPanel` displays each account name + state
   - Icons: ● green = registered, ○ red = failed, ◌ grey = unregistered
   - Updates reactively on `RegStateEvent`
   - **Done:** Widget reflects live registration state
 
-- [ ] **3.1.5** Wire startup: config → engine → accounts
+- [x] **3.1.5** Wire startup: config → engine → accounts
   - `SipttyApp.on_mount()` loads config, calls `engine.start()`,
     loops accounts and calls `add_account()` for each enabled one
   - Config path from CLI arg or `~/.config/siptty/config.toml`
@@ -312,28 +312,28 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.2 Outbound Call (Originate, Hangup)
 
-- [ ] **3.2.1** Implement `PhoneCall(pj.Call)` with `onCallState` callback
+- [x] **3.2.1** Implement `PhoneCall(pj.Call)` with `onCallState` callback
   - Maps pjsua2 call states → `CallStateEvent` state strings
   - Includes remote_uri, direction="outbound", duration
   - Posts event via `call_from_thread()`
   - **Done:** Callback fires with correct state progression
 
-- [ ] **3.2.2** Implement `PhoneCall.onCallMediaState` — audio plumbing
+- [x] **3.2.2** Implement `PhoneCall.onCallMediaState` — audio plumbing
   - On ACTIVE: connect call AudioMedia ↔ playback/capture devices
   - Works with null audio (null dev absorbs audio)
   - **Done:** Audio path established on call connect
 
-- [ ] **3.2.3** Implement `SipEngine.dial(account_id, uri, headers)`
+- [x] **3.2.3** Implement `SipEngine.dial(account_id, uri, headers)`
   - Creates `PhoneCall`, builds `CallOpParam` (audioCount=1, videoCount=0)
   - Applies optional SIP headers via `SipTxOption`
   - Calls `makeCall(uri, prm)`, stores in `_calls` dict
   - **Done:** Outbound INVITE sent; call_id returned
 
-- [ ] **3.2.4** Implement `SipEngine.hangup(call_id)`
+- [x] **3.2.4** Implement `SipEngine.hangup(call_id)`
   - Looks up call, calls `call.hangup(prm)`
   - **Done:** BYE/CANCEL sent; call terminated
 
-- [ ] **3.2.5** TUI dial input and call state display
+- [x] **3.2.5** TUI dial input and call state display
   - `d` focuses dial Input; Enter submits to `engine.dial()`
   - `CallStatusPanel` shows state, remote URI, duration
   - `h` calls `engine.hangup()` when call active
@@ -346,27 +346,27 @@ Moved first in implementation order because the engine needs config to start.
   - Dial non-existent → DISCONNECTED with reason
   - **Done:** `tests/integration/test_outbound.py` passes
 
-- [ ] **3.2.7** Call cleanup on DISCONNECTED state
+- [x] **3.2.7** Call cleanup on DISCONNECTED state
   - `onCallState` DISCONNECTED: remove from engine's `_calls` dict
   - No dangling references
   - **Done:** Calls are garbage-collected after disconnect
 
 ### 3.3 Inbound Call (Ring, Answer, Hangup)
 
-- [ ] **3.3.1** Implement `PhoneAccount.onIncomingCall` callback
+- [x] **3.3.1** Implement `PhoneAccount.onIncomingCall` callback
   - Creates `PhoneCall` for incoming call ID
   - Posts `CallStateEvent(state="incoming", direction="inbound")`
   - **Done:** Incoming calls detected and event fired
 
-- [ ] **3.3.2** Implement `SipEngine.answer(call_id)`
+- [x] **3.3.2** Implement `SipEngine.answer(call_id)`
   - Answers with 200 OK; media connected by `onCallMediaState`
   - **Done:** Incoming call answered; audio path established
 
-- [ ] **3.3.3** Implement `SipEngine.reject(call_id, code=486)`
+- [x] **3.3.3** Implement `SipEngine.reject(call_id, code=486)`
   - Hangs up with given status code (486 Busy / 603 Decline)
   - **Done:** Incoming call rejected with proper SIP response
 
-- [ ] **3.3.4** TUI incoming call notification and answer/reject
+- [x] **3.3.4** TUI incoming call notification and answer/reject
   - On incoming: panel shows "INCOMING: {remote_uri}" with visual alert
   - `a` answers, `h` rejects
   - After answer: state transitions to CONFIRMED
@@ -379,16 +379,16 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.4 Call Hold / Resume
 
-- [ ] **3.4.1** Implement `SipEngine.hold(call_id)`
+- [x] **3.4.1** Implement `SipEngine.hold(call_id)`
   - Calls `call.setHold()`; fires `CallStateEvent(state="hold")`
   - **Done:** re-INVITE with sendonly sent
 
-- [ ] **3.4.2** Implement `SipEngine.resume(call_id)`
+- [x] **3.4.2** Implement `SipEngine.resume(call_id)`
   - Calls `call.reinvite()` with UNHOLD flag
   - Fires `CallStateEvent(state="confirmed")`
   - **Done:** re-INVITE with sendrecv sent; audio reconnected
 
-- [ ] **3.4.3** TUI hold/resume toggle
+- [x] **3.4.3** TUI hold/resume toggle
   - Key binding toggles hold/resume
   - Panel shows "ON HOLD" when held; key hint updates
   - **Done:** Hold and resume work from TUI
@@ -400,18 +400,18 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.5 DTMF Sending
 
-- [ ] **3.5.1** Implement `SipEngine.send_dtmf(call_id, digits)`
+- [x] **3.5.1** Implement `SipEngine.send_dtmf(call_id, digits)`
   - Validates digits (0-9, *, #, A-D only)
   - Calls `call.dialDtmf()` (RFC 4733 telephone-event)
   - **Done:** DTMF digits sent in-band
 
-- [ ] **3.5.2** TUI DTMF input mode
+- [x] **3.5.2** TUI DTMF input mode
   - `p` enters DTMF mode; digit keys captured and sent
   - Visual feedback: "DTMF: 1234..." in call panel
   - Escape exits DTMF mode
   - **Done:** DTMF sendable from TUI during active call
 
-- [ ] **3.5.3** Unit test: DTMF validation
+- [x] **3.5.3** Unit test: DTMF validation
   - Valid digits accepted; invalid chars raise ValueError
   - **Done:** `tests/unit/test_dtmf.py` passes
 
@@ -422,17 +422,17 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.8 File Audio (Play and Record)
 
-- [ ] **3.8.1** Implement `SipEngine.play_audio(call_id, wav_path)`
+- [x] **3.8.1** Implement `SipEngine.play_audio(call_id, wav_path)`
   - Creates `AudioMediaPlayer`, opens WAV file
   - Connects player to call's `AudioMedia` via conference bridge
   - **Done:** WAV file audio sent into active call
 
-- [ ] **3.8.2** Implement `SipEngine.record_audio(call_id, wav_path)`
+- [x] **3.8.2** Implement `SipEngine.record_audio(call_id, wav_path)`
   - Creates `AudioMediaRecorder`, opens output WAV file
   - Connects call's `AudioMedia` to recorder via conference bridge
   - **Done:** Received audio saved to WAV file
 
-- [ ] **3.8.3** Implement `SipEngine.stop_audio(call_id)`
+- [x] **3.8.3** Implement `SipEngine.stop_audio(call_id)`
   - Disconnects and cleans up any active player/recorder on the call
   - Auto-cleanup on call disconnect
   - **Done:** Player/recorder stop cleanly
@@ -450,18 +450,18 @@ Moved first in implementation order because the engine needs config to start.
 
 ### 3.6 SIP Trace Log Panel
 
-- [ ] **3.6.1** Implement custom `pj.LogWriter` to capture SIP messages
+- [x] **3.6.1** Implement custom `pj.LogWriter` to capture SIP messages
   - Override `write(entry)`, filter for SIP messages
   - Construct `SipTraceEvent` with direction, message, timestamp
   - Post via `call_from_thread()`
   - **Done:** SIP messages captured as events
 
-- [ ] **3.6.2** Wire `LogWriter` into Endpoint config
+- [x] **3.6.2** Wire `LogWriter` into Endpoint config
   - Set `EpConfig.logConfig.writer`, level from config
   - Suppress console output, enable SIP message logging
   - **Done:** Engine captures SIP trace without stdout spam
 
-- [ ] **3.6.3** TUI SIP trace panel (RichLog widget)
+- [x] **3.6.3** TUI SIP trace panel (RichLog widget)
   - "SIP Trace" tab in bottom panel
   - Format: timestamp + direction arrow + message
   - Auto-scroll; buffer limited to 1000 messages
