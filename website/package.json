@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "eleventy --serve --quiet",
-    "build": "eleventy"
+    "start": "eleventy --config=.eleventy.cjs --serve --quiet",
+    "build": "eleventy --config=.eleventy.cjs"
   },
   "devDependencies": {
     "@11ty/eleventy": "^2.0.1"

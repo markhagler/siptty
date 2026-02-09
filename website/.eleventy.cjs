@@ -1,4 +1,4 @@
-export default function (eleventyConfig) {
+module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy({ "src/assets": "assets" });
   return {
     dir: {
@@ -7,4 +7,4 @@ export default function (eleventyConfig) {
     },
     htmlTemplateEngine: "njk"
   };
-}
+};

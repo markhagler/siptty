@@ -30,19 +30,18 @@ layout: base.njk
       </div>
       <div class="terminal__body" aria-label="Terminal preview">
         <div class="terminal__content">
-          <pre>
-┌──────────────────────────────────┐
-│ siptty        F1:Help            │
-│ ACCOUNTS  CALL  BLF              │
-│ ● alice   IDLE  ●201             │
-│ ○ bob     [__]  ○203             │
-├──────────────────────────────────┤
-│ INVITE sip:100@pbx               │
-│ Via: SIP/2.0/UDP                 │
-│ From: Alice <sip>                │
-│ UA: siptty/0.1                   │
-└──────────────────────────────────┘
-          </pre>
+          <pre>┌──────────────────────────────────────────────┐
+│ siptty                            F1:Help    │
+├──────────────┬──────────┬────────────────────┤
+│ ACCOUNTS     │ CALL     │ BLF                │
+│ ● alice      │ IDLE     │ ●201               │
+│ ○ bob        │ [______] │ ○203               │
+├──────────────┴──────────┴────────────────────┤
+│ INVITE sip:100@pbx SIP/2.0                   │
+│ Via: SIP/2.0/UDP                             │
+│ From: "Alice" &lt;sip:alice@pbx&gt;                │
+│ UA: siptty/0.1                               │
+└──────────────────────────────────────────────┘</pre>
         </div>
       </div>
     </div>
