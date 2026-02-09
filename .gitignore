@@ -56,3 +56,8 @@ siptty.toml
 
 # Docker
 docker-compose.override.yml
+
+# Go
+/siptty
+/spike/spike
+*.exe

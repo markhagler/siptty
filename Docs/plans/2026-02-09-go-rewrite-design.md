@@ -1,6 +1,8 @@
 # siptty Go Rewrite — Design Document
 
 Date: 2026-02-09
+Revised: 2026-02-09 — Incorporated reviewer feedback; added Phase 0 spike;
+deferred SIP trace/dialog viewer; redesigned TUI for multi-call and BLF.
 
 ## 1. Goals & Distribution
 
@@ -92,6 +94,16 @@ Python `call_from_thread()` bridge.
   Incoming calls arrive as handler callbacks, each in their own goroutine. The
   engine wraps these into events and pushes them onto the channel.
 
+### Forward-compatibility note
+
+The event channel and engine struct are designed to accept additional event types
+without structural changes. In particular, `SipTraceEvent` is defined in the
+event system (Section 4) so that raw SIP message capture can be wired in once
+sipgo's message interception API is validated. The TUI tab structure (Section 5)
+includes placeholder tabs for SIP Trace and SIP Dialogs that will consume these
+events. No MVP code depends on trace data flowing, but no architectural barriers
+prevent it from being added later.
+
 ---
 
 ## 3. Engine Layer & diago Integration
@@ -149,11 +161,23 @@ goroutine (coordinated via a channel on the `Call` struct).
 | Play WAV | `PlayAudio(callID, path)` | `dialog.PlaybackCreate(); pb.PlayFile(path)` |
 | Record | `Record(callID, path)` | `dialog.AudioStereoRecordingCreate(file)` |
 
-### SIP trace capture
+### SIP trace capture (deferred — not MVP)
 
-sipgo supports debug logging via environment variables. We hook into sipgo's
-logging to intercept raw SIP messages, wrap them as `SipTraceEvent`, and push
-onto the events channel.
+SIP trace capture is deferred until the Phase 0 feasibility spike validates
+sipgo's message interception API. The planned approach is:
+
+1. Hook into sipgo's message processing layer (not just debug logging) to
+   intercept raw SIP messages with direction and timestamps.
+2. Wrap intercepted messages as `SipTraceEvent` and push onto the events channel.
+3. Feed events to a `DialogTracker` (Section 4) for the sngrep-style viewer.
+
+**Hook point:** The `Engine` struct's `events` channel already supports
+`SipTraceEvent` as a defined event type. When trace capture is implemented, no
+changes to the TUI event loop, channel, or engine API are required — only the
+sipgo interception code needs to be written and wired in.
+
+**MVP workaround:** Engineers can run `sngrep` in a separate terminal for SIP
+trace visibility during early phases.
 
 ---
 
@@ -194,6 +218,11 @@ type DTMFEvent struct {
 }
 ```
 
+> **MVP note:** `SipTraceEvent` and `DTMFEvent` are defined in the event system
+> from day 1 so the channel and switch statement are ready. In MVP, no code
+> emits `SipTraceEvent` — it is activated when trace capture is implemented
+> post-Phase 0 spike. `DTMFEvent` is wired in MVP for received DTMF display.
+
 ### TUI event loop
 
 A single goroutine reads from `engine.Events()` and switches on event type:
@@ -205,10 +234,13 @@ go func() {
         case RegStateEvent:
             accountPanel.Update(e)
         case CallStateEvent:
-            callPanel.Update(e)
-        case SipTraceEvent:
-            traceLog.Append(e)
-            dialogTracker.Ingest(e)
+            callTable.Update(e) // updates call table, not single-call display
+        case DTMFEvent:
+            callTable.ShowDTMF(e)
+        // SipTraceEvent handling — wired post-Phase 0 spike:
+        // case SipTraceEvent:
+        //     traceLog.Append(e)
+        //     dialogTracker.Ingest(e)
         }
         app.QueueUpdateDraw(func() {})
     }
@@ -218,10 +250,14 @@ go func() {
 `app.QueueUpdateDraw()` is tview's thread-safe redraw trigger — similar in
 purpose to Python Textual's `call_from_thread()` but simpler.
 
-### Dialog tracker
+### Dialog tracker (deferred — not MVP)
 
-A struct that ingests `SipTraceEvent`s and groups them by Call-ID into dialog
-objects. This is the data model behind the sngrep-style viewer.
+The dialog tracker is a future component that ingests `SipTraceEvent`s and
+groups them by Call-ID into dialog objects. This is the data model behind the
+planned sngrep-style viewer. It is deferred until trace capture is validated
+in the Phase 0 feasibility spike.
+
+The planned data model is preserved here for reference:
 
 ```go
 type DialogTracker struct {
@@ -238,10 +274,10 @@ type Dialog struct {
 }
 ```
 
-SIP message parsing extracts enough from each trace event to populate the dialog
-tracker — Call-ID, From, To, CSeq, method, status code, Via, Contact.
-Straightforward header parsing, not a full SIP parser. sipgo has header parsing
-utilities we can reuse.
+When implemented, SIP message parsing will extract enough from each trace event
+to populate the dialog tracker — Call-ID, From, To, CSeq, method, status code.
+sipgo has header parsing utilities that can be reused. The `internal/trace/`
+package (Section 7) is reserved for this code.
 
 ---
 
@@ -256,22 +292,23 @@ tabbed bottom section.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ siptty                                           F1:Help  F10:Quit  │
 ├──────────────────┬───────────────────────────────┬───────────────────┤
-│ ACCOUNTS         │ CALL CONTROL                  │ BLF / PRESENCE    │
+│ ACCOUNTS         │ CALLS                         │ BLF / PRESENCE    │
 │                  │                               │                   │
-│ ● alice@pbx.io  │ State: CONFIRMED              │ (placeholder for  │
-│   Registered     │ Remote: sip:100@pbx.io        │  future phase)    │
-│   UDP 5060       │ Duration: 00:01:23            │                   │
-│                  │                               │                   │
-│ ○ bob@sip.co    │ Dial: [___________________]   │                   │
-│   Unregistered   │                               │                   │
+│ ● alice@pbx.io  │ ID   Remote         State Dur │ Ext  Name   State │
+│   Registered     │ ▸ 1  sip:100@pbx   CONF 1:23 │ 201  Bob    ●Idle │
+│   UDP 5060       │   2  sip:201@pbx   HOLD 0:45 │ 202  Carol  ◉Busy │
+│                  │   3  sip:300@co     RING 0:03 │ 203  Dave   ○Off  │
+│ ○ bob@sip.co    │                               │ 204  Eve    ◎Ring │
+│   Unregistered   │ Dial: [___________________]   │                   │
+│                  │                               │ [+] Add BLF...    │
 │                  │ [d]Dial [a]Ans [h]Hang [m]Mute│                   │
 ├──────────────────┴───────────────────────────────┴───────────────────┤
 │ [ Calls ] [ SIP Trace ] [ SIP Dialogs ]                             │
 ├──────────────────────────────────────────────────────────────────────┤
-│ INVITE sip:100@pbx.io SIP/2.0                                      │
-│ Via: SIP/2.0/UDP 10.0.0.5:5060;branch=z9hG4bK-524287-1            │
-│ From: "Alice" <sip:alice@pbx.io>;tag=abc123                        │
-│ ...                                                                  │
+│ 15:04:01 INVITE sip:100@pbx.io → 100 Trying                        │
+│ 15:04:01 INVITE sip:100@pbx.io → 180 Ringing                       │
+│ 15:04:03 INVITE sip:100@pbx.io → 200 OK                            │
+│ (SIP Trace and SIP Dialogs tabs are placeholders — not active in MVP)│
 ├──────────────────────────────────────────────────────────────────────┤
 │ [d]Dial [a]Ans [h]Hang [x]Xfer [m]Mute [p]DTMF [Tab]Panels        │
 └──────────────────────────────────────────────────────────────────────┘
@@ -279,19 +316,26 @@ tabbed bottom section.
 
 ### tview widget mapping
 
-| UI Element | tview Widget |
-|------------|-------------|
-| Overall layout | `Grid` (rows: header, main, tabs, footer) |
-| Three columns | `Grid` (3 columns: 1fr / 2fr / 1fr) |
-| Account list | `List` with colored items |
-| Call state | `TextView` with dynamic content |
-| Dial input | `InputField` |
-| BLF panel | `Table` (placeholder, wired in future phase) |
-| Bottom tabs | `Pages` (switched by Tab key) |
-| SIP trace log | `TextView` (append-only, scrolling) |
-| Key hints | `TextView` anchored to bottom row |
+| UI Element | tview Widget | Notes |
+|------------|-------------|-------|
+| Overall layout | `Grid` (rows: header, main, tabs, footer) | |
+| Three columns | `Grid` (3 columns: 1fr / 2fr / 1fr) | |
+| Account list | `List` with colored items | |
+| Call table | `Table` with selectable rows | Columns: ID, Remote, State, Duration. Supports multiple rows from day 1. MVP may limit engine to one active call, but UI shows all. |
+| Dial input | `InputField` | Below call table |
+| BLF panel | `Table` with colored rows | Columns: Extension, Name, State. Placeholder data in MVP — wired to SUBSCRIBE/NOTIFY in Phase 2. Colored state indicators: idle=green, busy=red, ringing=yellow, offline=grey. |
+| Bottom tabs | `Pages` (switched by Tab key) | Three pages: Calls, SIP Trace, SIP Dialogs |
+| Calls tab | `Table` — call event log | Summary of call events (not raw SIP) |
+| SIP Trace tab | `TextView` (append-only, scrolling) | **Placeholder in MVP** — shows "Run sngrep for SIP traces" until trace capture is wired |
+| SIP Dialogs tab | `TextView` | **Placeholder in MVP** — shows "SIP dialog viewer available in a future release" |
+| Key hints | `TextView` anchored to bottom row | |
 
-### SIP dialog viewer (sngrep-style) — three levels of drill-down
+### SIP dialog viewer (sngrep-style) — deferred, not MVP
+
+The sngrep-style dialog viewer is deferred until SIP trace capture is validated
+and implemented. The design below is preserved as the target specification for
+the future implementation. The "SIP Dialogs" tab in the TUI is a placeholder
+that will be activated when this feature is built.
 
 Implementation reference: https://github.com/irontec/sngrep
 
@@ -404,9 +448,19 @@ overrides come in a future phase.
 
 ```
 siptty/
+├── _python-prototype/             # Archived Python+PJSIP prototype
+│   ├── src/siptty/
+│   ├── tests/
+│   ├── docker/
+│   ├── scripts/
+│   ├── research/
+│   ├── pyproject.toml
+│   └── Makefile
 ├── cmd/
 │   └── siptty/
 │       └── main.go              # entry point, config loading, wires engine → TUI
+├── spike/
+│   └── main.go                  # Phase 0 feasibility spike (temporary, not shipped)
 ├── internal/
 │   ├── config/
 │   │   ├── config.go            # Config structs + TOML loader
@@ -417,7 +471,7 @@ siptty/
 │   │   ├── account.go           # Account registration lifecycle
 │   │   ├── call.go              # Call struct wrapping diago dialog sessions
 │   │   └── engine_test.go
-│   ├── trace/
+│   ├── trace/                   # DEFERRED — reserved for post-spike implementation
 │   │   ├── parser.go            # SIP message header parser
 │   │   ├── tracker.go           # DialogTracker — groups messages by Call-ID
 │   │   └── tracker_test.go
@@ -433,11 +487,12 @@ siptty/
 ├── go.mod
 ├── go.sum
 ├── Makefile
-├── Docs/                        # design docs (carried over)
+├── Docs/                        # design docs (shared)
 ├── tests/
-│   ├── asterisk/                # Asterisk config (carried over)
+│   ├── asterisk/                # Asterisk config (shared with Go tests)
 │   └── integration_test.go      # integration tests against Asterisk in Docker
-└── docker-compose.test.yml      # Asterisk test environment (carried over)
+├── docker-compose.test.yml      # Asterisk test environment (shared)
+└── README.md
 ```
 
 ### Key decisions
@@ -446,7 +501,11 @@ siptty/
 - `cmd/siptty/main.go` is thin: parse flags, load config, create engine,
   create TUI, wire together, run.
 - `trace/` is separate from `engine/` because the dialog tracker and SIP parser
-  are pure data structures with no diago dependency — easy to unit test.
+  are pure data structures with no diago dependency — easy to unit test. This
+  package is reserved but not implemented until the Phase 0 spike validates
+  sipgo's message interception capabilities.
+- `spike/` contains the Phase 0 feasibility spike — a standalone program that
+  validates core assumptions before committing to the full build.
 - Integration tests use `testcontainers-go` for Asterisk container lifecycle.
 
 ### Dependencies (go.mod)
@@ -482,11 +541,13 @@ No network, no Docker, no diago. Run with `go test ./...`:
 
 - **Config parsing:** Valid TOML loads, missing required fields error, defaults
   applied, invalid transport rejected, header overrides parsed.
-- **SIP trace parser:** Extract Call-ID, Method, status code, From, To from raw
-  SIP message strings. Table-driven tests with real SIP message samples.
-- **Dialog tracker:** Ingest a sequence of `SipTraceEvent`s, verify dialogs
-  grouped correctly by Call-ID, state transitions tracked, message ordering
-  preserved.
+- **SIP trace parser:** *(Deferred — not MVP)* Extract Call-ID, Method, status
+  code, From, To from raw SIP message strings. Table-driven tests with real SIP
+  message samples. Implemented when `internal/trace/` package is built.
+- **Dialog tracker:** *(Deferred — not MVP)* Ingest a sequence of
+  `SipTraceEvent`s, verify dialogs grouped correctly by Call-ID, state
+  transitions tracked, message ordering preserved. Implemented when
+  `internal/trace/` package is built.
 - **Event types:** All event structs constructible with expected fields.
 - **DTMF validation:** Valid digits accepted (0-9, *, #, A-D), invalid chars
   rejected.
@@ -497,8 +558,13 @@ tview lacks a test pilot like Textual, so TUI testing is more limited:
 
 - **Widget construction:** Panels create without panic, layout renders at a
   given terminal size.
-- **Dialog ladder renderer:** Given a `Dialog` struct, verify ASCII ladder
-  output is correct. Pure function (data in, string out), easily testable.
+- **Dialog ladder renderer:** *(Deferred — not MVP)* Given a `Dialog` struct,
+  verify ASCII ladder output is correct. Pure function (data in, string out),
+  easily testable. Implemented alongside the SIP dialog viewer.
+- **Call table rendering:** Given a list of `CallStateEvent`s, verify the call
+  table displays correct rows with expected columns (ID, Remote, State, Duration).
+- **BLF panel rendering:** Given mock BLF state data, verify the panel displays
+  correct rows with colored state indicators.
 - **Key binding mapping:** Key constants map to expected action strings.
 
 ### Integration tests
@@ -514,64 +580,165 @@ Asterisk config files (`tests/asterisk/pjsip.conf`, `extensions.conf`,
 - **Inbound call:** Two engine instances (ext 100 + 101), one calls the other,
   answer, verify both confirmed, hangup.
 - **DTMF:** Call DTMF test extension (602), send digits, verify no errors.
-- **SIP trace capture:** Register, verify trace events contain REGISTER and
-  200 OK.
+- **SIP trace capture:** *(Deferred — not MVP)* Register, verify trace events
+  contain REGISTER and 200 OK. Implemented when trace capture is wired in.
 
 Integration tests use `testcontainers-go` for container lifecycle. Set
 `SIPTTY_ASTERISK_UP=1` to skip container management when Asterisk is already
 running.
 
+### Phase 0 feasibility spike tests
+
+The spike (`spike/main.go`) is a standalone program, not part of the test suite.
+It validates each capability manually against a running Asterisk instance and
+prints pass/fail results. The spike covers:
+
+1. Registration against Asterisk via diago — register, verify 200 OK, unregister.
+2. Outbound call — INVITE to echo extension (600), verify media, BYE.
+3. DTMF sending — call DTMF test extension (602), send digits via
+   `AudioWriterDTMF`.
+4. WAV file playback — play a test WAV into a call via `PlaybackCreate()`.
+5. Mute/unmute — verify `PlaybackControl.Mute()` / `.Unmute()` works mid-call.
+6. Raw SIP message interception — attempt to hook into sipgo's transport or
+   logging layer to capture raw SIP messages. Document what level of access is
+   achievable and what gaps remain for the trace viewer.
+
+The spike is disposable — it proves feasibility before committing to the full
+build. Results inform whether any items marked "MVP (risk)" in the feature
+mapping table need to be reclassified.
+
 ---
 
 ## 9. MVP Scope & Deferred Work
 
-### MVP — Phase 1
+### Phase 0 — Feasibility Spike
 
-Everything diago provides out of the box, plus the TUI:
+Before building the full application, write a standalone `spike/main.go` that
+validates core assumptions about sipgo/diago against a real Asterisk instance.
 
-| Feature | Source |
-|---------|--------|
-| SIP registration with digest auth | diago `Register()` |
-| Unregistration | diago context cancellation |
-| Outbound calls (INVITE/BYE) | diago `Invite()` |
-| Inbound calls (answer/reject) | diago `Serve()` + `Answer()` |
-| Hangup | diago `Hangup()` |
-| Send DTMF (RFC 4733) | diago `AudioWriterDTMF()` |
-| Receive DTMF | diago `AudioReaderDTMF()` |
-| Mute/unmute | diago `PlaybackControl.Mute()` |
-| Blind transfer (REFER) | diago `Refer()` |
-| File audio — play WAV into call | diago `PlaybackCreate()` |
-| File audio — record from call | diago `AudioStereoRecordingCreate()` |
-| Null audio mode (signaling only) | No media reader/writer |
-| SIP trace log panel | sipgo debug logging hooks |
-| SIP dialog viewer (sngrep-style) | Custom: trace parser + dialog tracker + tview |
-| TOML config file | `BurntSushi/toml` |
-| Custom SIP headers (config-level) | sipgo header access |
-| TUI with full layout | tview Grid/Pages/Table |
-| Single-binary cross-platform builds | `go build`, CGO_ENABLED=0 |
-| G.711 ulaw/alaw codecs | diago built-in, pure Go |
+| Validation target | What to prove | Risk if it fails |
+|---|---|---|
+| Registration | `diago.Register()` against Asterisk, digest auth, refresh | Blocker — entire plan depends on this |
+| Outbound call | `diago.Invite()` → SDP → RTP → `Hangup()` | Blocker |
+| DTMF sending | `dialog.AudioWriterDTMF().WriteDTMF()` | Medium — fallback to SIP INFO |
+| WAV playback | `dialog.PlaybackCreate(); pb.PlayFile(path)` | Medium — may need custom RTP writer |
+| Mute/unmute | `PlaybackControl.Mute()` / `.Unmute()` | Low — can stub with media disconnect |
+| Raw SIP interception | Access sipgo transport layer or logging hooks for raw messages | Informs trace viewer timeline, not a blocker |
 
-### Phase 2 — Custom sipgo work required
+**Exit criteria:** Items 1-2 must pass. Items 3-5 should pass or have documented
+workarounds. Item 6 produces a written assessment of trace capture feasibility.
 
-| Feature | Reason deferred |
-|---------|----------------|
-| Hold/resume | No diago API — need re-INVITE with SDP direction |
-| BLF subscriptions (RFC 4235) | No diago SUBSCRIBE/NOTIFY |
-| MWI (RFC 3842) | SUBSCRIBE/NOTIFY pattern |
-| Presence (RFC 3856) | SUBSCRIBE/NOTIFY pattern |
-| Attended transfer | Only blind transfer in diago |
-| Conference (3+ party) | diago bridge is 2-party only |
-| Multiple simultaneous calls | UI + call manager complexity |
+### Phase 1 — MVP
+
+Everything diago provides out of the box, plus the multi-call TUI. SIP trace
+capture and the dialog viewer are explicitly excluded from MVP.
+
+| Feature | Source | Notes |
+|---|---|---|
+| SIP registration with digest auth | diago `Register()` | |
+| Unregistration | diago context cancellation | |
+| Outbound calls (INVITE/BYE) | diago `Invite()` | |
+| Inbound calls (answer/reject) | diago `Serve()` + `Answer()` | |
+| Hangup | diago `Hangup()` | |
+| Send DTMF (RFC 4733) | diago `AudioWriterDTMF()` | Validated in spike |
+| Receive DTMF | diago `AudioReaderDTMF()` | |
+| Mute/unmute | diago `PlaybackControl.Mute()` | Validated in spike |
+| Blind transfer (REFER) | diago `Refer()` | |
+| File audio — play WAV into call | diago `PlaybackCreate()` | Validated in spike |
+| File audio — record from call | diago `AudioStereoRecordingCreate()` | |
+| Null audio mode (signaling only) | No media reader/writer | |
+| TOML config file | `BurntSushi/toml` | |
+| Custom SIP headers (config-level) | sipgo header access | |
+| TUI with multi-call table | tview `Table` | UI supports N calls; engine may limit to 1 active |
+| TUI with BLF placeholder panel | tview `Table` | Columns ready; no backend subscription yet |
+| TUI with deferred tab placeholders | tview `Pages` | SIP Trace + SIP Dialogs tabs visible but inactive |
+| Single-binary cross-platform builds | `go build`, CGO_ENABLED=0 | |
+| G.711 ulaw/alaw codecs | diago built-in, pure Go | |
+
+**Removed from MVP (was in original plan):**
+- SIP trace log panel — deferred until trace capture is validated
+- SIP dialog viewer (sngrep-style) — deferred until trace capture is validated
+
+### Phase 2 — Standard (Desk phone parity + SIP trace)
+
+| Feature | Reason deferred | Custom work required |
+|---|---|---|
+| SIP trace capture | Depends on Phase 0 spike results | sipgo message interception |
+| SIP dialog viewer | Depends on trace capture | `internal/trace/` package |
+| Hold/resume | No diago API | re-INVITE with SDP direction |
+| BLF subscriptions (RFC 4235) | No diago SUBSCRIBE/NOTIFY | SUBSCRIBE/NOTIFY transaction support |
+| MWI (RFC 3842) | SUBSCRIBE/NOTIFY pattern | Same as BLF |
+| Presence (RFC 3856) | SUBSCRIBE/NOTIFY pattern | SUBSCRIBE/PUBLISH handling |
+| Attended transfer | Only blind transfer in diago | Replaces handling |
+| Conference (3+ party) | diago bridge is 2-party only | Audio mixing or external bridge |
+| Multiple simultaneous calls (engine) | Engine complexity | Call manager + hold/resume integration |
+| Runtime header editor (F3) | Config-level headers cover MVP | Per-request header mutation pipeline |
 
 ### Phase 3 — Advanced
 
-| Feature | Reason deferred |
-|---------|----------------|
-| Opus codec | Requires CGO or pure Go encoder |
-| G.722 codec | Only minimal Go transpilation exists |
-| ICE/STUN/TURN | Not in diago |
-| Session timers (RFC 4028) | Not in diago |
-| 100rel/PRACK (RFC 3262) | Not in sipgo |
-| Browser audio (WebSocket) | Significant custom work |
-| Runtime header editor (F3) | Config-level headers cover MVP |
-| Call history (SQLite) | Nice-to-have |
+| Feature | Reason deferred | Custom work required |
+|---|---|---|
+| Opus codec | Requires CGO or pure Go encoder | Codec implementation + SDP negotiation |
+| G.722 codec | Only minimal Go transpilation exists | Same |
+| ICE/STUN/TURN | Not in diago | NAT traversal stack |
+| SRTP media | Not in diago | Encrypted media pipeline |
+| Session timers (RFC 4028) | Not in diago | Timer handling |
+| 100rel/PRACK (RFC 3262) | Not in sipgo | Custom SIP extension |
+| TLS signaling | Depends on sipgo TLS support | Transport configuration |
+| DNS SRV/NAPTR (RFC 3263) | Validate sipgo support | May be built-in |
+| SIP MESSAGE (IM) | Not in diago | MESSAGE support |
+| Call history (SQLite) | Nice-to-have | App-layer storage |
+| Browser audio (WebSocket) | Dropped — terminal-first tool, not planned | WebSocket audio bridge — not planned |
+
+### Canonical Feature Mapping (DESIGN.md → Go Plan)
+
+This table is the authoritative roadmap for feature parity with the original
+Python/PJSIP design. It incorporates the reviewer's analysis of what sipgo/diago
+provide and what requires custom implementation.
+
+**Legend:**
+- **MVP** = Phase 1 scope
+- **P2** = Phase 2 scope
+- **P3** = Phase 3 scope
+- **Custom** = requires substantial custom SIP/media work beyond sipgo/diago
+- **Dropped** = not planned for the Go rewrite
+- **(risk)** = depends on spike validation or diago API limitations
+
+| Feature (from DESIGN.md) | Go plan status | Notes |
+|---|---|---|
+| Register / Unregister | MVP | diago `Register()` + context cancel |
+| Outbound / inbound calls | MVP | Core diago flow |
+| Hangup | MVP | diago `Hangup()` |
+| Call hold / resume | P2 + Custom | Needs re-INVITE with SDP direction |
+| Mute / unmute | MVP (risk) | Depends on diago media control; validated in spike |
+| Send DTMF | MVP (risk) | diago `AudioWriterDTMF()`; validated in spike |
+| Receive DTMF | MVP (risk) | diago `AudioReaderDTMF()` |
+| SIP trace display | P2 (risk) | Requires reliable raw SIP hook; spike assesses feasibility |
+| SIP dialog viewer | P2 (risk) | Depends on trace capture fidelity |
+| File audio play/record | MVP (risk) | diago media pipeline; validated in spike |
+| Null audio mode | MVP | No media reader/writer |
+| BLF subscriptions | P2 + Custom | SUBSCRIBE/NOTIFY support needed |
+| MWI | P2 + Custom | SUBSCRIBE/NOTIFY support needed |
+| Presence pub/sub | P2 + Custom | SUBSCRIBE/PUBLISH handling |
+| Blind transfer | MVP | diago `Refer()` |
+| Attended transfer | P2 + Custom | Needs Replaces handling |
+| 3-way conference | P2 + Custom | Audio mixing/bridge needed |
+| Multiple simultaneous calls (UI) | MVP | TUI call table supports N rows from day 1 |
+| Multiple simultaneous calls (engine) | P2 | Engine call manager + hold/resume |
+| Call history (SQLite) | P3 | App-layer only |
+| Runtime header editor | P2 + Custom | Per-request header mutation pipeline |
+| Config header overrides | MVP | Config-level only |
+| User-Agent spoofing | MVP | Header override or transport option |
+| TLS signaling | P3 | Depends on sipgo TLS support |
+| SRTP media | P3 + Custom | Not in diago |
+| ICE/STUN/TURN | P3 + Custom | Not in diago |
+| DNS SRV/NAPTR | P3 | sipgo RFC 3263 support — validate |
+| 100rel/PRACK | P3 + Custom | Not in sipgo |
+| SIP MESSAGE (IM) | P3 + Custom | Needs MESSAGE support |
+| Browser audio | Dropped | Terminal-first tool; not a priority |
+
+**Key changes from the reviewer's original table:**
+- SIP trace display and dialog viewer moved from MVP to P2 (per user decision)
+- Multiple simultaneous calls split into UI (MVP) and engine (P2)
+- Runtime header editor moved from P3 to P2 (aligns with desk phone parity)
+- All "(risk)" items are addressed by the Phase 0 feasibility spike
