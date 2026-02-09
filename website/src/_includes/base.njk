@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "siptty" }}</title>
+    <meta name="description" content="{{ description or "Terminal-first SIP softphone." }}" />
+    <link rel="stylesheet" href="/assets/css/site.css" />
+  </head>
+  <body>
+    <div class="scanlines"></div>
+    <div class="page">
+      <header class="hero">
+        <div class="hero__brand">
+          <span class="prompt">$</span> siptty
+        </div>
+        <nav class="hero__nav">
+          <a href="#features">features</a>
+          <a href="#architecture">architecture</a>
+          <a href="#design">design</a>
+          <a href="#status">status</a>
+        </nav>
+      </header>
+      <main>
+        {{ content | safe }}
+      </main>
+      <footer class="footer">
+        <div>MIT Licensed · Built for the terminal.</div>
+      </footer>
+    </div>
+  </body>
+</html>

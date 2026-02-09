@@ -1,0 +1,145 @@
+---
+layout: base.njk
+title: siptty
+---
+<section class="intro">
+  <div class="intro__text">
+    <h1>Terminal-native SIP softphone.</h1>
+    <p>
+      siptty is a full-featured SIP user agent with a real-time terminal UI.
+      Built for telecom engineers, devops, and anyone who needs a SIP Swiss Army knife over SSH.
+    </p>
+    <div class="intro__cta">
+      <a class="btn" href="https://github.com/" aria-label="GitHub repository">View on GitHub</a>
+      <a class="btn btn--ghost" href="#status">See roadmap</a>
+    </div>
+    <div class="intro__meta">
+      <span>Python 3.11+</span>
+      <span>PJSIP + pjsua2</span>
+      <span>Textual TUI</span>
+      <span>PyInstaller single binary</span>
+    </div>
+  </div>
+  <div class="intro__panel">
+    <div class="terminal">
+      <div class="terminal__bar">
+        <span class="dot dot--red"></span>
+        <span class="dot dot--yellow"></span>
+        <span class="dot dot--green"></span>
+        <span class="terminal__title">siptty.tui</span>
+      </div>
+      <pre>
+┌─────────────────────────────────────────────────────────┐
+│ siptty                                  F1:Help F10:Quit │
+├──────────────────┬─────────────────────┬────────────────┤
+│ ACCOUNTS         │ CALL CONTROL        │ BLF / PRESENCE │
+│ ● alice@pbx.io   │ State: IDLE         │ ● 201 Available│
+│   Registered     │ Dial: [___________] │ ◉ 202 On Phone │
+│ ○ bob@sip.co     │ [d]Dial [a]Answer   │ ○ 203 Offline  │
+├──────────────────┴─────────────────────┴────────────────┤
+│ [ Calls ] [ SIP Trace ] [ History ] [ Config ]          │
+├─────────────────────────────────────────────────────────┤
+│ INVITE sip:100@pbx.io SIP/2.0                            │
+│ Via: SIP/2.0/UDP 10.0.0.5:5060;branch=z9hG4bK           │
+│ From: "Alice" <sip:alice@pbx.io>;tag=abc123             │
+│ To: <sip:100@pbx.io>                                    │
+│ User-Agent: siptty/0.1                                  │
+└─────────────────────────────────────────────────────────┘
+      </pre>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <h2>Why siptty</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Full desk-phone parity</h3>
+      <p>Register, call, hold, transfer, conference, BLF, and presence — from the terminal.</p>
+    </div>
+    <div class="card">
+      <h3>Hackable SIP stack</h3>
+      <p>Override any header, spoof devices, and craft requests for testing and debugging.</p>
+    </div>
+    <div class="card">
+      <h3>Live SIP trace</h3>
+      <p>Integrated trace and dialog view for real-time inspection without leaving the UI.</p>
+    </div>
+    <div class="card">
+      <h3>Ships as one binary</h3>
+      <p>PyInstaller packaging delivers a single download-and-run tool.</p>
+    </div>
+  </div>
+</section>
+
+<section id="architecture" class="section section--accent">
+  <h2>Architecture</h2>
+  <div class="columns">
+    <div>
+      <p>
+        Textual drives the async UI while PJSIP runs on worker threads.
+        siptty bridges these with a dedicated engine layer that normalizes events and commands.
+      </p>
+      <ul>
+        <li>Async Textual TUI + keyboard-first workflows</li>
+        <li>SIP engine layer wraps pjsua2 and emits typed events</li>
+        <li>Thread-safe handoff via call_from_thread()</li>
+        <li>BLF + presence subscriptions managed centrally</li>
+      </ul>
+    </div>
+    <div class="terminal terminal--compact">
+      <pre>
+Textual UI
+    │
+    │ call_from_thread()
+    ▼
+SIP Engine (Python)
+    │
+    ▼
+pjsua2 / PJSIP
+    │
+    ▼
+UDP/TCP/TLS + RTP
+      </pre>
+    </div>
+  </div>
+</section>
+
+<section id="design" class="section">
+  <h2>Design goals</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Terminal-first ergonomics</h3>
+      <p>Fast keybindings, responsive layout, and focus on headless workflows.</p>
+    </div>
+    <div class="card">
+      <h3>Testing & emulation</h3>
+      <p>Override headers, emulate devices, and inspect dialogs like sngrep — all in one UI.</p>
+    </div>
+    <div class="card">
+      <h3>Production-grade SIP</h3>
+      <p>PJSIP brings robust media, codec support, and NAT traversal capabilities.</p>
+    </div>
+  </div>
+</section>
+
+<section id="status" class="section section--accent">
+  <h2>Status</h2>
+  <p>
+    Design phase complete. Implementation is next. Track tasks in <code>Docs/TASKS.md</code>.
+  </p>
+  <div class="status">
+    <div>
+      <h4>MVP</h4>
+      <p>Registration, calls, hold/resume, DTMF, SIP trace.</p>
+    </div>
+    <div>
+      <h4>Standard</h4>
+      <p>Transfers, conferencing, BLF, call history.</p>
+    </div>
+    <div>
+      <h4>Advanced</h4>
+      <p>SRTP, TLS, dialog viewer, call recording.</p>
+    </div>
+  </div>
+</section>
