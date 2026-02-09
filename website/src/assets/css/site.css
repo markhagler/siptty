@@ -88,6 +88,11 @@ body {
   align-items: center;
 }
 
+.intro__text,
+.intro__panel {
+  min-width: 0;
+}
+
 .intro h1 {
   font-size: clamp(2rem, 2.6vw, 2.8rem);
   margin-bottom: 12px;
@@ -141,6 +146,19 @@ body {
   overflow: hidden;
 }
 
+.terminal__body::-webkit-scrollbar {
+  height: 8px;
+}
+
+.terminal__body::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.terminal__body::-webkit-scrollbar-track {
+  background: #08160c;
+}
+
 .terminal__bar {
   display: flex;
   align-items: center;
@@ -171,6 +189,12 @@ body {
   color: var(--accent);
 }
 
+.terminal__body {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
 .terminal pre {
   margin: 0;
   padding: 20px;
@@ -178,6 +202,7 @@ body {
   line-height: 1.4;
   color: var(--text);
   white-space: pre;
+  min-width: max-content;
 }
 
 .terminal--compact pre {
@@ -245,7 +270,22 @@ body {
     align-items: flex-start;
   }
 
+  .intro {
+    grid-template-columns: 1fr;
+  }
+
   .terminal pre {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .intro {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal pre {
+    font-size: 0.7rem;
   }
 }
