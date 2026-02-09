@@ -134,4 +134,4 @@ See [Docs/TASKS.md](Docs/TASKS.md) for the roadmap.
 
 ## License
 
-TBD
+MIT
