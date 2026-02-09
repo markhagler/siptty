@@ -146,18 +146,6 @@ body {
   overflow: hidden;
 }
 
-.terminal__body::-webkit-scrollbar {
-  height: 8px;
-}
-
-.terminal__body::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 999px;
-}
-
-.terminal__body::-webkit-scrollbar-track {
-  background: #08160c;
-}
 
 .terminal__bar {
   display: flex;
@@ -190,11 +178,12 @@ body {
 }
 
 .terminal__body {
-  overflow-x: auto;
   max-width: 100%;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
-  overscroll-behavior-x: contain;
+  overflow: hidden;
+}
+
+.terminal__content {
+  transform-origin: top left;
 }
 
 .terminal pre {
@@ -277,15 +266,29 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .terminal__content {
+    transform: scale(0.78);
+  }
+
   .terminal pre {
     font-size: 0.7rem;
     padding: 16px;
   }
 }
 
+@media (max-width: 700px) and (orientation: portrait) {
+  .terminal__content {
+    transform: scale(0.7);
+  }
+}
+
 @media (max-width: 900px) and (orientation: landscape) {
   .intro {
     grid-template-columns: 1fr;
+  }
+
+  .terminal__content {
+    transform: scale(0.8);
   }
 
   .terminal pre {
@@ -300,5 +303,13 @@ body {
 
   .terminal pre {
     scroll-snap-align: start;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 700px) and (orientation: portrait) {
+    .terminal__content {
+      transform: scale(0.68);
+    }
   }
 }
