@@ -157,6 +157,38 @@ class PhoneCall(pj.Call if PJSUA2_AVAILABLE else object):  # type: ignore[misc]
     # Audio helpers
     # ------------------------------------------------------------------
 
+    def play_audio(self, wav_path: str) -> None:
+        """Play a WAV file into the call via the conference bridge."""
+        ci = self.getInfo()
+        player = pj.AudioMediaPlayer()
+        player.createPlayer(wav_path)
+        # Connect player to call's audio media
+        for mi_idx in range(len(ci.media)):
+            if ci.media[mi_idx].type == pj.PJMEDIA_TYPE_AUDIO:
+                call_media = self.getAudioMedia(mi_idx)
+                player.startTransmit(call_media)
+                break
+        self._audio_player = player
+        log.info("Playing %s into call %d", wav_path, ci.id)
+
+    def record_audio(self, wav_path: str) -> None:
+        """Record audio from the call to a WAV file."""
+        ci = self.getInfo()
+        recorder = pj.AudioMediaRecorder()
+        recorder.createRecorder(wav_path)
+        # Connect call's audio media to recorder
+        for mi_idx in range(len(ci.media)):
+            if ci.media[mi_idx].type == pj.PJMEDIA_TYPE_AUDIO:
+                call_media = self.getAudioMedia(mi_idx)
+                call_media.startTransmit(recorder)
+                break
+        self._audio_recorder = recorder
+        log.info("Recording call %d to %s", ci.id, wav_path)
+
+    def stop_audio(self) -> None:
+        """Stop any active player/recorder."""
+        self._cleanup_audio()
+
     def _cleanup_audio(self) -> None:
         """Stop and cleanup any active audio player/recorder."""
         self._audio_player = None

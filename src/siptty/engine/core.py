@@ -260,6 +260,31 @@ class SipEngine:
         call.do_send_dtmf(digits)
 
     # ------------------------------------------------------------------
+    # File audio
+    # ------------------------------------------------------------------
+
+    def play_audio(self, call_id: int, wav_path: str) -> None:
+        """Play a WAV file into an active call."""
+        call = self._calls.get(call_id)
+        if call is None:
+            raise ValueError(f"Call {call_id} not found")
+        call.play_audio(wav_path)
+
+    def record_audio(self, call_id: int, wav_path: str) -> None:
+        """Record audio from an active call to a WAV file."""
+        call = self._calls.get(call_id)
+        if call is None:
+            raise ValueError(f"Call {call_id} not found")
+        call.record_audio(wav_path)
+
+    def stop_audio(self, call_id: int) -> None:
+        """Stop any active player/recorder on a call."""
+        call = self._calls.get(call_id)
+        if call is None:
+            raise ValueError(f"Call {call_id} not found")
+        call.stop_audio()
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
