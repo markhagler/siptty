@@ -1,0 +1,34 @@
+/* siptty – main TUI stylesheet */
+
+/* Top panel row: three-column layout */
+#top-panels {
+    height: auto;
+    min-height: 10;
+    max-height: 14;
+}
+
+/* Left column – accounts */
+AccountPanel {
+    width: 1fr;
+    border: solid $accent;
+    padding: 0 1;
+}
+
+/* Centre column – call control (wider) */
+CallControlPanel {
+    width: 2fr;
+    border: solid $accent;
+    padding: 0 1;
+}
+
+/* Right column – BLF / presence */
+BlfPanel {
+    width: 1fr;
+    border: solid $accent;
+    padding: 0 1;
+}
+
+/* Bottom tabbed area fills remaining space */
+TabbedContent {
+    height: 1fr;
+}
