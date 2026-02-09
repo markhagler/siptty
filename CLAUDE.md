@@ -1,0 +1,1 @@
+-When creating or modifying documentation our standard documentation folder name is Docs/ with a capital D. Always use this directory when looking for documentation, writing documentation, or updating documentation. 
