@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# Dockerfile.pjsua2-builder
+# Builds pjsua2 Python 3.12 SWIG bindings from pjproject 2.14.1 source.
+# ---------------------------------------------------------------------------
+FROM python:3.12-bookworm AS builder
+
+ARG PJPROJECT_TAG=2.14.1
+
+# ── system deps ──────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        swig \
+        python3-dev \
+        libasound2-dev \
+        libopus-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify SWIG 4.x is available
+RUN swig -version | head -3
+
+# Python 3.12 removed distutils from stdlib; pjproject's setup.py needs it.
+RUN pip install --no-cache-dir setuptools
+
+# ── clone pjproject ─────────────────────────────────────────────────────────
+WORKDIR /build
+RUN git clone --depth 1 --branch ${PJPROJECT_TAG} \
+        https://github.com/pjsip/pjproject.git
+
+WORKDIR /build/pjproject
+
+# ── obtain Python build flags ───────────────────────────────────────────────
+# We query the running Python so the .so links against the right libpython.
+RUN PYTHON_CFLAGS=$(python3-config --cflags)   && \
+    PYTHON_LDFLAGS=$(python3-config --ldflags)  && \
+    echo "Python CFLAGS:  ${PYTHON_CFLAGS}"    && \
+    echo "Python LDFLAGS: ${PYTHON_LDFLAGS}"
+
+# ── configure ───────────────────────────────────────────────────────────────
+RUN ./configure \
+        --enable-shared \
+        --with-external-pa=no \
+        --disable-video \
+        --disable-v4l2 \
+        --disable-openh264 \
+        CFLAGS="$(python3-config --cflags)" \
+        LDFLAGS="$(python3-config --ldflags)" \
+    && cat config.log | tail -40
+
+# ── build pjproject ─────────────────────────────────────────────────────────
+RUN make dep  && make -j"$(nproc)"
+
+# ── build SWIG Python bindings ──────────────────────────────────────────────
+# Build only the Python SWIG bindings (not Java which requires JAVA_HOME).
+# Use --no-print-directory to avoid make messages being misinterpreted as
+# linker input by g++ when setup.py invokes the compiler.
+RUN cd pjsip-apps/src/swig/python && make --no-print-directory
+
+# ── stage the artifacts in a well-known location ────────────────────────────
+# setup.py build places _pjsua2.so under build/lib.*/; pjsua2.py is generated
+# directly in the python/ directory by SWIG.
+RUN mkdir -p /output && \
+    find pjsip-apps/src/swig/python -name '_pjsua2*.so' -exec cp {} /output/_pjsua2.so \; && \
+    cp pjsip-apps/src/swig/python/pjsua2.py /output/ && \
+    ls -lh /output/
+
+# Quick smoke-test inside the builder: the .so should at least be loadable.
+# We need the pjproject shared libs on LD_LIBRARY_PATH.
+RUN export LD_LIBRARY_PATH=/build/pjproject/pjlib/lib:/build/pjproject/pjlib-util/lib:/build/pjproject/pjnath/lib:/build/pjproject/pjmedia/lib:/build/pjproject/pjsip/lib:/build/pjproject/third_party/lib:${LD_LIBRARY_PATH} && \
+    python3 -c "import sys; sys.path.insert(0, '/output'); import pjsua2; print('pjsua2 import OK – module loaded')"
+
+# ---------------------------------------------------------------------------
+# Final thin stage – just the artifacts (keeps image small for COPY --from)
+# ---------------------------------------------------------------------------
+FROM python:3.12-bookworm
+
+# We still need the runtime C libs that pjproject links against.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libasound2 \
+        libopus0 \
+        libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pjproject shared libraries (including third_party codecs like libgsmcodec)
+COPY --from=builder /build/pjproject/pjlib/lib/*.so*        /usr/local/lib/
+COPY --from=builder /build/pjproject/pjlib-util/lib/*.so*   /usr/local/lib/
+COPY --from=builder /build/pjproject/pjnath/lib/*.so*       /usr/local/lib/
+COPY --from=builder /build/pjproject/pjmedia/lib/*.so*      /usr/local/lib/
+COPY --from=builder /build/pjproject/pjsip/lib/*.so*        /usr/local/lib/
+COPY --from=builder /build/pjproject/third_party/lib/*.so*  /usr/local/lib/
+RUN ldconfig
+
+# Copy the Python bindings
+COPY --from=builder /output/_pjsua2.so /output/_pjsua2.so
+COPY --from=builder /output/pjsua2.py  /output/pjsua2.py
+
+# Also install into site-packages so `python -c 'import pjsua2'` works.
+RUN SITE=$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))') && \
+    cp /output/_pjsua2.so "${SITE}/" && \
+    cp /output/pjsua2.py  "${SITE}/"
+
+# Verify the import works in the final image
+RUN python3 -c "import pjsua2; print('pjsua2 import OK in final image')"
+
+LABEL description="pjsua2 Python 3.12 SWIG bindings (pjproject 2.14.1)"
