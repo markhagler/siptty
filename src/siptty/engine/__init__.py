@@ -10,9 +10,13 @@ except ImportError:
     pj = None  # type: ignore[assignment]
     PJSUA2_AVAILABLE = False
 
+# Deferred import to avoid referencing pj at module level when unavailable.
+from siptty.engine.core import SipEngine  # noqa: E402
+
 __all__ = [
     "PJSUA2_AVAILABLE",
     "CallStateEvent",
     "RegStateEvent",
+    "SipEngine",
     "SipTraceEvent",
 ]
