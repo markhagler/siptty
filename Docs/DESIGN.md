@@ -13,7 +13,8 @@ over SSH.
    debugging, and emulating specific devices.
 3. **Real-time TUI** — live registration state, call state, BLF panel, SIP
    trace log. Keyboard-driven, no mouse required.
-4. **Single-binary distribution** — PyInstaller-packaged, download and run.
+4. **Easy distribution** — Docker image for zero-install usage, PyInstaller
+   binary as alternative. No audio driver dependencies at runtime.
 5. **Testable** — automated test suite against Asterisk in Docker.
 
 ## 2. Tech Stack
@@ -23,7 +24,8 @@ over SSH.
 | SIP/Media | PJSIP via pjsua2 Python bindings | 20yr mature, full UA+RTP+codecs+ICE |
 | TUI | Textual (Python) | Best-in-class terminal UI, CSS layout, async |
 | Config | TOML | Human-friendly, good Python support |
-| Packaging | PyInstaller | Proven single-binary for Python+native libs |
+| Packaging | Docker + PyInstaller | Docker image primary; PyInstaller alternative |
+| Build | Docker (multi-stage) | Controlled build env, solves SWIG/pjsua2 deps |
 | Testing | pytest + Asterisk Docker | Real PBX integration tests |
 | Language | Python 3.11+ | Sweet spot for pjsua2 bindings + Textual |
 
@@ -71,6 +73,37 @@ over SSH.
 - **Header Override**: A pipeline that intercepts outgoing SIP messages and
   applies configured overrides before they hit the wire.
 
+### Audio Architecture
+
+siptty does **not** depend on local audio devices. Instead, audio is handled
+through three modes, from simplest to most capable:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      pjsua2 Conference Bridge                │
+│                                                              │
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐ │
+│  │ Null Audio    │  │ File Audio     │  │ Browser Audio    │ │
+│  │ (signaling    │  │ (play WAV in,  │  │ (WebSocket ↔    │ │
+│  │  only)        │  │  record out)   │  │  WebAudio API)  │ │
+│  └──────────────┘  └───────────────┘  └──────────────────┘ │
+│                                                              │
+│  AudioMediaPlayer   AudioMediaRecorder   WebSocket bridge   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Mode | Use case | pjsua2 mechanism |
+|------|----------|------------------|
+| **Null audio** | Signaling-only testing/debugging, SIP trace analysis | `Endpoint.audDevManager().setNullDev()` |
+| **File audio** | Play WAV into calls, record received audio to WAV | `AudioMediaPlayer` / `AudioMediaRecorder` |
+| **Browser audio** | Live conversation via web browser on any device | WebSocket bridge to embedded HTTP server, browser uses WebAudio API for mic/speaker |
+
+This design means:
+- **No ALSA/PulseAudio dependency** — works in Docker, headless servers, SSH
+- **File audio enables automation** — script test calls, IVR testing, load testing
+- **Browser audio enables live calls** — open a web page, talk through your
+  browser's mic/speaker, even over SSH or remote connections
+
 ## 4. Feature Tiers
 
 ### Tier 1 — MVP (Usable SIP phone)
@@ -88,7 +121,8 @@ over SSH.
 | Send DTMF | RFC 4733 telephone-event | Call.dialDtmf() |
 | SIP trace display | Log callback | Endpoint.logWriter |
 | Config file | TOML | tomllib (stdlib 3.11+) |
-| Audio device select | PJSIP audio dev | Endpoint.audDevManager() |
+| Null audio mode | No audio device needed | Endpoint.audDevManager().setNullDev() |
+| File audio (play/record) | WAV playback into call, record from call | AudioMediaPlayer / AudioMediaRecorder |
 
 ### Tier 2 — Standard (Desk phone parity)
 
@@ -126,6 +160,8 @@ over SSH.
 | SIP MESSAGE (IM) | RFC 3428 | Account.onInstantMessage() |
 | Multicast page send | RTP to multicast addr | Direct socket / pjmedia |
 | PyInstaller binary | Single-file packaging | Build pipeline |
+| Browser audio (live) | WebSocket ↔ WebAudio bridge | Embedded HTTP server + AudioMedia |
+| Docker image | Containerized distribution | Multi-stage Dockerfile |
 | SIP dialog viewer | sngrep-style call flow | SIP trace + parser |
 
 ### Tier 3 Highlight: SIP Dialog Viewer (sngrep-style)
@@ -464,12 +500,66 @@ sip_uri = "sip:bob@other-pbx.com"
 # ... second account ...
 
 [audio]
-input_device = ""                # empty = system default
-output_device = ""
-ring_file = "ring.wav"           # optional custom ring
+mode = "null"                    # null | file | browser
+play_file = ""                   # WAV file to play into calls (file mode)
+record_dir = ""                  # directory to save recorded audio (file mode)
+record_format = "wav"            # wav
+browser_port = 8080              # HTTP port for browser audio UI (browser mode)
 
 [history]
 enabled = true
 db_file = "~/.siptty/history.db"
 max_entries = 1000
+```
+
+## 10. Distribution
+
+### Docker Image (Primary)
+
+```dockerfile
+# Multi-stage build: compile pjsua2 with correct SWIG, then copy to slim image
+FROM python:3.12-bookworm AS builder
+RUN apt-get update && apt-get install -y build-essential swig4.0 \
+    libasound2-dev libopus-dev libssl-dev
+# ... build pjsua2 ...
+
+FROM python:3.12-slim-bookworm
+COPY --from=builder /usr/local/lib/python3.12/site-packages/pjsua2* ...
+# ... install siptty ...
+ENTRYPOINT ["siptty"]
+```
+
+Usage:
+```bash
+# Signaling only (null audio)
+docker run -it --net=host -v ~/.config/siptty:/config siptty
+
+# With file audio
+docker run -it --net=host \
+  -v ~/.config/siptty:/config \
+  -v ./audio:/audio \
+  siptty --audio-mode file --play-file /audio/prompt.wav
+
+# With browser audio
+docker run -it --net=host \
+  -v ~/.config/siptty:/config \
+  -p 8080:8080 \
+  siptty --audio-mode browser
+# Then open http://localhost:8080 in your browser for mic/speaker
+```
+
+### PyInstaller Binary (Alternative)
+
+Single-file download for users who don't have Docker:
+```bash
+curl -LO https://github.com/markhagler/siptty/releases/latest/download/siptty
+chmod +x siptty
+./siptty
+```
+
+### pip (Developer Install)
+
+Requires pjsua2 to be installed separately (see Docs/PJSUA2_INSTALL.md):
+```bash
+pip install siptty
 ```

@@ -164,6 +164,29 @@ Three parallel tracks after the project skeleton (2.1) is done:
   - `test_quit_key`: press q → app exits
   - **Done:** `pytest tests/tui/ -v` passes green
 
+### 2.5 Docker build environment
+
+- [ ] **2.5.1** Create `Dockerfile` with multi-stage build
+  - Stage 1 (builder): python:3.12-bookworm, install SWIG 4.1.x + build deps,
+    compile pjsua2 from pjproject source
+  - Stage 2 (runtime): python:3.12-slim-bookworm, copy compiled pjsua2,
+    install siptty
+  - **Done:** `docker build -t siptty .` succeeds; `docker run siptty --help` works
+
+- [ ] **2.5.2** Verify pjsua2 works inside the container
+  - Run `scripts/check_pjsua2.py` inside the container
+  - **Done:** `docker run siptty python scripts/check_pjsua2.py` prints version
+
+- [ ] **2.5.3** Create `docker-compose.yml` for development
+  - Mounts source code, uses the built image, enables hot-reload
+  - **Done:** `docker compose up` starts siptty with live code
+
+- [ ] **2.5.4** Update Makefile with Docker targets
+  - `docker-build`: builds the image
+  - `docker-run`: runs siptty in Docker with `--net=host`
+  - `docker-test`: runs tests inside the container
+  - **Done:** All three targets work
+
 ---
 
 ## Phase 3: MVP Implementation
@@ -171,18 +194,19 @@ Three parallel tracks after the project skeleton (2.1) is done:
 Build order — each group proceeds once dependencies are met:
 
 ```
- Group A (config):     3.7 ────────────────────────────────────────▶
- Group B (engine):     3.0 ───▶
- Group C (register):   3.1 ────────▶
- Group D (trace):      3.6 ─────▶          (parallel with E)
- Group E (outbound):   3.2 ────────────▶
- Group F (inbound):    3.3 ──────────▶
- Group G (hold):       3.4 ──────▶
- Group H (dtmf):       3.5 ──────▶
+ Group A (config):      3.7 ─────────────────────────────────────────▶
+ Group B (engine):      3.0 ───▶
+ Group C (register):    3.1 ────────▶
+ Group D (trace):       3.6 ─────▶         (parallel with E)
+ Group E (outbound):    3.2 ────────────▶
+ Group F (inbound):     3.3 ──────────▶
+ Group G (hold):        3.4 ──────▶
+ Group H (dtmf):        3.5 ──────▶
+ Group I (file audio):  3.8 ──────▶        (after E, parallel with F)
 
  A ──▶ B ──▶ C ──▶ E ──▶ F ──▶ G ──▶ H
-              │
-              └──▶ D (parallel with E)
+              │         │
+              └──▶ D    └──▶ I
 ```
 
 ### 3.0 Engine Lifecycle & Foundation
@@ -208,11 +232,13 @@ essential — the engine needs to boot before it can do anything.
   - Store transport ID on engine
   - **Done:** Engine starts with a UDP transport
 
-- [ ] **3.0.4** Null audio device support
-  - When `config.general.null_audio` is True, call
-    `Endpoint.audDevManager().setNullDev()`
-  - All tests use null audio
-  - **Done:** Engine starts in null audio mode without errors
+- [ ] **3.0.4** Audio mode support (null and file)
+  - Null mode: `Endpoint.audDevManager().setNullDev()` — signaling only
+  - File mode: `AudioMediaPlayer` to play WAV into calls,
+    `AudioMediaRecorder` to record received audio to WAV
+  - Config field `audio.mode` selects mode ("null" or "file")
+  - All tests use null audio mode
+  - **Done:** Engine starts in null or file audio mode without errors
 
 - [ ] **3.0.5** Unit test: engine lifecycle
   - Start with null_audio=True, stop — no error
@@ -394,6 +420,34 @@ Moved first in implementation order because the engine needs config to start.
   - Verify call stays CONFIRMED (no errors)
   - **Done:** `tests/integration/test_dtmf.py` passes
 
+### 3.8 File Audio (Play and Record)
+
+- [ ] **3.8.1** Implement `SipEngine.play_audio(call_id, wav_path)`
+  - Creates `AudioMediaPlayer`, opens WAV file
+  - Connects player to call's `AudioMedia` via conference bridge
+  - **Done:** WAV file audio sent into active call
+
+- [ ] **3.8.2** Implement `SipEngine.record_audio(call_id, wav_path)`
+  - Creates `AudioMediaRecorder`, opens output WAV file
+  - Connects call's `AudioMedia` to recorder via conference bridge
+  - **Done:** Received audio saved to WAV file
+
+- [ ] **3.8.3** Implement `SipEngine.stop_audio(call_id)`
+  - Disconnects and cleans up any active player/recorder on the call
+  - Auto-cleanup on call disconnect
+  - **Done:** Player/recorder stop cleanly
+
+- [ ] **3.8.4** TUI file audio controls
+  - When audio.mode is "file" and a call is active, show play/record controls
+  - Key binding to start/stop playback and recording
+  - Status indicator showing play/record state
+  - **Done:** Can play WAV and record audio from TUI during a call
+
+- [ ] **3.8.5** Integration test: file audio
+  - Call echo extension, play WAV, record response, verify output file exists
+    and has non-zero size
+  - **Done:** `tests/integration/test_file_audio.py` passes
+
 ### 3.6 SIP Trace Log Panel
 
 - [ ] **3.6.1** Implement custom `pj.LogWriter` to capture SIP messages
@@ -442,7 +496,7 @@ Moved first in implementation order because the engine needs config to start.
 ## Phase 6: Advanced Features
 - [ ] 6.1 TLS/SRTP
 - [ ] 6.2 Presence publish/subscribe
-- [ ] 6.3 Call recording
+- [ ] 6.3 Browser audio (WebSocket ↔ WebAudio bridge for live mic/speaker)
 - [ ] 6.4 Codec selection/priority UI
 - [ ] 6.5 NAT traversal (STUN/ICE/TURN)
 - [ ] 6.6 DNS SRV/NAPTR

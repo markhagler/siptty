@@ -26,7 +26,8 @@ Think Bria or a Yealink desk phone, but in your terminal.
 - Mute/unmute
 - Live SIP trace panel
 - TOML config file
-- Audio device selection
+- File audio (play WAV into calls, record received audio)
+- No audio device dependency — works headless, in Docker, over SSH
 
 ### Standard
 - Multiple simultaneous accounts
@@ -58,7 +59,7 @@ Think Bria or a Yealink desk phone, but in your terminal.
 | Terminal UI | [Textual](https://github.com/Textualize/textual) |
 | Config | TOML (Python 3.11+ stdlib) |
 | Testing | pytest + Asterisk in Docker |
-| Packaging | PyInstaller |
+| Packaging | Docker + PyInstaller |
 
 ## TUI Preview
 
