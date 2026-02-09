@@ -193,6 +193,8 @@ body {
   overflow-x: auto;
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  overscroll-behavior-x: contain;
 }
 
 .terminal pre {
@@ -202,6 +204,7 @@ body {
   line-height: 1.4;
   color: var(--text);
   white-space: pre;
+  display: inline-block;
   min-width: max-content;
 }
 
@@ -287,5 +290,15 @@ body {
 
   .terminal pre {
     font-size: 0.7rem;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  .terminal__body {
+    scroll-snap-type: x mandatory;
+  }
+
+  .terminal pre {
+    scroll-snap-align: start;
   }
 }
