@@ -267,18 +267,12 @@ body {
   }
 
   .terminal__content {
-    transform: scale(0.78);
+    transform: scale(1);
   }
 
   .terminal pre {
-    font-size: 0.7rem;
+    font-size: 0.9rem;
     padding: 16px;
-  }
-}
-
-@media (max-width: 700px) and (orientation: portrait) {
-  .terminal__content {
-    transform: scale(0.7);
   }
 }
 
@@ -288,11 +282,11 @@ body {
   }
 
   .terminal__content {
-    transform: scale(0.8);
+    transform: scale(1);
   }
 
   .terminal pre {
-    font-size: 0.7rem;
+    font-size: 0.85rem;
   }
 }
 
@@ -306,10 +300,3 @@ body {
   }
 }
 
-@supports (-webkit-touch-callout: none) {
-  @media (max-width: 700px) and (orientation: portrait) {
-    .terminal__content {
-      transform: scale(0.68);
-    }
-  }
-}

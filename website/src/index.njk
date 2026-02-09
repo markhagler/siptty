@@ -31,22 +31,17 @@ layout: base.njk
       <div class="terminal__body" aria-label="Terminal preview">
         <div class="terminal__content">
           <pre>
-┌─────────────────────────────────────────────────────────┐
-│ siptty                                  F1:Help F10:Quit │
-├──────────────────┬─────────────────────┬────────────────┤
-│ ACCOUNTS         │ CALL CONTROL        │ BLF / PRESENCE │
-│ ● alice@pbx.io   │ State: IDLE         │ ● 201 Available│
-│   Registered     │ Dial: [___________] │ ◉ 202 On Phone │
-│ ○ bob@sip.co     │ [d]Dial [a]Answer   │ ○ 203 Offline  │
-├──────────────────┴─────────────────────┴────────────────┤
-│ [ Calls ] [ SIP Trace ] [ History ] [ Config ]          │
-├─────────────────────────────────────────────────────────┤
-│ INVITE sip:100@pbx.io SIP/2.0                            │
-│ Via: SIP/2.0/UDP 10.0.0.5:5060;branch=z9hG4bK           │
-│ From: "Alice" <sip:alice@pbx.io>;tag=abc123             │
-│ To: <sip:100@pbx.io>                                    │
-│ User-Agent: siptty/0.1                                  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────┐
+│ siptty        F1:Help            │
+│ ACCOUNTS  CALL  BLF              │
+│ ● alice   IDLE  ●201             │
+│ ○ bob     [__]  ○203             │
+├──────────────────────────────────┤
+│ INVITE sip:100@pbx               │
+│ Via: SIP/2.0/UDP                 │
+│ From: Alice <sip>                │
+│ UA: siptty/0.1                   │
+└──────────────────────────────────┘
           </pre>
         </div>
       </div>
