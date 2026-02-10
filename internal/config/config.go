@@ -21,6 +21,8 @@ type GeneralConfig struct {
 	LogLevel  int    `toml:"log_level"`
 	LogFile   string `toml:"log_file"`
 	UserAgent string `toml:"user_agent"`
+	BindHost  string `toml:"bind_host"` // local IP to bind (default: "0.0.0.0")
+	BindPort  int    `toml:"bind_port"` // local port to bind (default: 0 = ephemeral)
 }
 
 // AccountConfig holds a single SIP account's settings.
@@ -144,6 +146,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.General.UserAgent == "" {
 		cfg.General.UserAgent = "siptty/0.1"
+	}
+	if cfg.General.BindHost == "" {
+		cfg.General.BindHost = "0.0.0.0"
 	}
 	if cfg.Audio.Mode == "" {
 		cfg.Audio.Mode = "null"

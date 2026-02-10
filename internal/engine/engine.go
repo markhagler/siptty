@@ -89,8 +89,8 @@ func NewEngine(cfg *config.Config) (*Engine, error) {
 	}
 	e.dg = diago.NewDiago(ua, diago.WithTransport(diago.Transport{
 		Transport: transport,
-		BindHost:  "0.0.0.0",
-		BindPort:  0, // ephemeral
+		BindHost:  cfg.General.BindHost,
+		BindPort:  cfg.General.BindPort,
 	}))
 
 	// Set up account structs.

@@ -1,0 +1,21 @@
+# siptty example config — for testing against Asterisk in Docker
+#
+# Copy to siptty.toml and adjust as needed:
+#   cp siptty.example.toml siptty.toml
+
+[general]
+log_level = 4          # 1=error, 2=warn, 3=info, 4=debug
+# log_file = "siptty.log"  # uncomment to log to file instead of stderr
+bind_host = "172.18.0.1"   # Docker bridge gateway — change for your network
+# bind_port = 0            # 0 = ephemeral port (default)
+
+[[accounts]]
+name = "ext100"
+sip_uri = "sip:100@172.18.0.2"
+auth_password = "test100"
+registrar = "sip:100@172.18.0.2:5060"
+# transport = "udp"        # default
+# reg_expiry = 300         # default (seconds)
+
+[audio]
+mode = "null"              # "null" = signaling only, "file" = WAV playback/record
