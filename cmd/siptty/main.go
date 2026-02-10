@@ -51,17 +51,18 @@ func main() {
 
 	logOpts := &slog.HandlerOptions{Level: logLevel}
 	var logHandler slog.Handler
-	if cfg.General.LogFile != "" {
-		f, err := os.OpenFile(cfg.General.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error opening log file: %v\n", err)
-			os.Exit(1)
-		}
-		defer f.Close()
-		logHandler = slog.NewTextHandler(f, logOpts)
-	} else {
-		logHandler = slog.NewTextHandler(os.Stderr, logOpts)
+	logFile := cfg.General.LogFile
+	if logFile == "" {
+		// TUI owns stderr — logs must go to a file, never the terminal.
+		logFile = "siptty.log"
 	}
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error opening log file %s: %v\n", logFile, err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	logHandler = slog.NewTextHandler(f, logOpts)
 	slog.SetDefault(slog.New(logHandler))
 
 	// Create engine.

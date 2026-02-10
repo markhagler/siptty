@@ -4,8 +4,8 @@
 #   cp siptty.example.toml siptty.toml
 
 [general]
-log_level = 4          # 1=error, 2=warn, 3=info, 4=debug
-# log_file = "siptty.log"  # uncomment to log to file instead of stderr
+log_level = 3          # 1=error, 2=warn, 3=info, 4=debug
+# log_file = "siptty.log"  # default; logs always go to a file (TUI owns the terminal)
 bind_host = "172.18.0.1"   # Docker bridge gateway — change for your network
 # bind_port = 0            # 0 = ephemeral port (default)
 
