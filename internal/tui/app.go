@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"log/slog"
+	"sync/atomic"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -44,6 +46,10 @@ type App struct {
 
 	// overlay prevents global keys from interfering with modals/prompts
 	overlay bool
+
+	// traceDirty is set when trace events are buffered but not yet flushed.
+	// A timer goroutine flushes and redraws at most every 50ms.
+	traceDirty atomic.Bool
 }
 
 // NewApp builds the full tview layout and returns an App.
@@ -175,16 +181,31 @@ func (a *App) eventLoop() {
 				a.calls.Update(e)
 			})
 		case engine.SipTraceEvent:
-			// Write directly to tview.TextView (goroutine-safe via io.Writer)
-			// and trigger a non-blocking draw. This avoids QueueUpdateDraw which
-			// blocks the caller and can backpressure the SIP stack.
-			a.trace.Append(e)
-			a.app.Draw()
+			// Buffer the trace text (goroutine-safe, never blocks) and schedule
+			// a debounced flush+redraw. This keeps the eventLoop free-running
+			// and batches rapid trace events into a single redraw.
+			a.trace.Buffer(e)
+			a.scheduleTraceDraw()
 		case engine.DTMFEvent:
 			a.app.QueueUpdateDraw(func() {
 				a.calls.ShowDTMF(e)
 			})
 		}
+	}
+}
+
+// scheduleTraceDraw ensures a flush+redraw happens within 50ms.
+// Multiple trace events in the window are batched into one redraw.
+// The QueueUpdateDraw blocks the timer goroutine, never the eventLoop.
+func (a *App) scheduleTraceDraw() {
+	if a.traceDirty.CompareAndSwap(false, true) {
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			a.traceDirty.Store(false)
+			a.app.QueueUpdateDraw(func() {
+				a.trace.Flush()
+			})
+		}()
 	}
 }
 

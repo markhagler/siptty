@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/rivo/tview"
 	"github.com/siptty/siptty/internal/engine"
@@ -11,9 +12,14 @@ import (
 const maxTraceMessages = 1000
 
 // TracePanel displays a scrolling SIP message trace log.
+// Trace events are buffered and flushed to the tview.TextView periodically
+// to avoid blocking the eventLoop goroutine with tview's synchronous draw calls.
 type TracePanel struct {
 	view     *tview.TextView
 	msgCount int
+
+	mu      sync.Mutex
+	pending strings.Builder
 }
 
 // NewTracePanel creates a scrolling TextView for SIP trace messages.
@@ -25,10 +31,9 @@ func NewTracePanel() *TracePanel {
 	return &TracePanel{view: tv}
 }
 
-// Append formats and appends a SIP trace event to the view.
-// Send messages are green (→), received messages are yellow (←).
-// Keeps at most maxTraceMessages entries by trimming from the front.
-func (p *TracePanel) Append(ev engine.SipTraceEvent) {
+// Buffer formats a SIP trace event and appends it to the pending buffer.
+// Goroutine-safe. Does not touch tview widgets directly.
+func (p *TracePanel) Buffer(ev engine.SipTraceEvent) {
 	var color, arrow string
 	switch ev.Direction {
 	case "send":
@@ -50,10 +55,26 @@ func (p *TracePanel) Append(ev engine.SipTraceEvent) {
 		color, firstLine,
 	)
 
-	fmt.Fprint(p.view, entry)
-	p.msgCount++
+	p.mu.Lock()
+	p.pending.WriteString(entry)
+	p.mu.Unlock()
+}
 
-	// Trim old messages if we exceed the limit.
+// Flush writes all pending trace text to the tview.TextView and scrolls to end.
+// Must be called on the tview main goroutine (inside QueueUpdateDraw).
+func (p *TracePanel) Flush() {
+	p.mu.Lock()
+	text := p.pending.String()
+	p.pending.Reset()
+	p.mu.Unlock()
+
+	if text == "" {
+		return
+	}
+
+	fmt.Fprint(p.view, text)
+	p.msgCount += strings.Count(text, "\n") / 2
+
 	if p.msgCount > maxTraceMessages {
 		p.trim()
 	}
@@ -65,7 +86,6 @@ func (p *TracePanel) Append(ev engine.SipTraceEvent) {
 func (p *TracePanel) trim() {
 	text := p.view.GetText(false)
 	lines := strings.Split(text, "\n")
-	// Each message is 2 lines (header + first SIP line), trim oldest entries.
 	excess := p.msgCount - maxTraceMessages
 	linesToRemove := excess * 2
 	if linesToRemove >= len(lines) {

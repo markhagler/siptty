@@ -28,7 +28,8 @@ type CallPanel struct {
 func NewCallPanel() *CallPanel {
 	table := tview.NewTable().
 		SetBorders(false).
-		SetSelectable(true, false)
+		SetSelectable(false, false). // Disabled until a call row exists (avoids tview infinite loop).
+		SetFixed(1, 0)              // Row 0 is a fixed header.
 	table.SetTitle("CALLS").SetBorder(true)
 
 	// Header row.
@@ -63,6 +64,8 @@ func (p *CallPanel) Update(ev engine.CallStateEvent) {
 		cr = &callRow{row: p.nextRow}
 		p.calls[ev.CallID] = cr
 		p.nextRow++
+		// Enable row selection now that a selectable row exists.
+		p.table.SetSelectable(true, false)
 	}
 	cr.state = ev.State
 
