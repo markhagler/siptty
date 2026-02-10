@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +18,17 @@ import (
 
 func main() {
 	configPath := flag.String("config", "", "path to config file")
+	debug := flag.Bool("debug", false, "enable pprof endpoint on localhost:6060")
 	flag.Parse()
+
+	if *debug {
+		go func() {
+			slog.Info("pprof server starting", "addr", "localhost:6060")
+			if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+				slog.Error("pprof server failed", "error", err)
+			}
+		}()
+	}
 
 	// Find config file.
 	cfgPath := *configPath
@@ -75,8 +87,8 @@ func main() {
 	// Create TUI.
 	app := tui.NewApp(eng)
 
-	// Start engine.
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	// Start engine with a cancellable context (not tied to signals).
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := eng.Start(ctx); err != nil {
@@ -84,11 +96,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Signal handler: first SIGINT/SIGTERM stops gracefully, second force-exits.
+	sigCh := make(chan os.Signal, 2)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		slog.Info("signal received, shutting down")
+		app.Stop()
+		cancel()
+		<-sigCh
+		slog.Warn("second signal received, force exiting")
+		os.Exit(1)
+	}()
+
 	// Run TUI (blocks until quit).
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 	}
 
 	// Clean shutdown.
+	cancel()
 	eng.Stop()
 }

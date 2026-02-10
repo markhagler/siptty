@@ -32,10 +32,11 @@ type Engine struct {
 // sipTracer implements sipgo's sip.SIPTracer interface to capture raw SIP messages.
 type sipTracer struct {
 	events chan<- Event
+	once   sync.Once
 }
 
 func (t *sipTracer) SIPTraceRead(transport, laddr, raddr string, msg []byte) {
-	t.events <- SipTraceEvent{
+	ev := SipTraceEvent{
 		Direction:  "recv",
 		Message:    string(msg),
 		Timestamp:  time.Now(),
@@ -43,10 +44,15 @@ func (t *sipTracer) SIPTraceRead(transport, laddr, raddr string, msg []byte) {
 		LocalAddr:  laddr,
 		RemoteAddr: raddr,
 	}
+	select {
+	case t.events <- ev:
+	default:
+		t.dropWarn()
+	}
 }
 
 func (t *sipTracer) SIPTraceWrite(transport, laddr, raddr string, msg []byte) {
-	t.events <- SipTraceEvent{
+	ev := SipTraceEvent{
 		Direction:  "send",
 		Message:    string(msg),
 		Timestamp:  time.Now(),
@@ -54,6 +60,17 @@ func (t *sipTracer) SIPTraceWrite(transport, laddr, raddr string, msg []byte) {
 		LocalAddr:  laddr,
 		RemoteAddr: raddr,
 	}
+	select {
+	case t.events <- ev:
+	default:
+		t.dropWarn()
+	}
+}
+
+func (t *sipTracer) dropWarn() {
+	t.once.Do(func() {
+		slog.Warn("SIP trace events dropped: channel full, TUI too slow")
+	})
 }
 
 // NewEngine creates a new engine from the config.
@@ -112,6 +129,17 @@ func NewEngine(cfg *config.Config) (*Engine, error) {
 // Events returns the read-only event channel for the TUI.
 func (e *Engine) Events() <-chan Event {
 	return e.events
+}
+
+// Accounts returns the IDs of all configured accounts.
+func (e *Engine) Accounts() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	ids := make([]string, 0, len(e.accounts))
+	for id := range e.accounts {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // Start begins serving (for inbound calls) and registers all accounts.

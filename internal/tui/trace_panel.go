@@ -20,10 +20,7 @@ type TracePanel struct {
 func NewTracePanel() *TracePanel {
 	tv := tview.NewTextView().
 		SetDynamicColors(true).
-		SetScrollable(true).
-		SetChangedFunc(func() {
-			// Auto-scroll handled by tview when ScrollToEnd is called.
-		})
+		SetScrollable(true)
 	tv.SetTitle("SIP Trace").SetBorder(true)
 	return &TracePanel{view: tv}
 }
