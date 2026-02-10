@@ -1,8 +1,11 @@
 # siptty Go Rewrite — Design Document
 
 Date: 2026-02-09
-Revised: 2026-02-10 — Phase 0 spike completed; all 6 validations passed;
-de-risked all "(risk)" items; SIP trace capture validated via sipgo SIPTracer API.
+Revised: 2026-02-10 — Promoted SIP trace capture to Phase 1 MVP; demoted
+mute/unmute to Phase 2 (not needed with null/canned audio). Phase 0 spike
+completed; all 6 validations passed; de-risked all "(risk)" items.
+Previous: 2026-02-10 — Phase 0 spike completed; SIP trace capture validated
+via sipgo SIPTracer API.
 Previous: 2026-02-09 — Incorporated reviewer feedback; added Phase 0 spike;
 deferred SIP trace/dialog viewer; redesigned TUI for multi-call and BLF.
 
@@ -99,12 +102,11 @@ Python `call_from_thread()` bridge.
 ### Forward-compatibility note
 
 The event channel and engine struct are designed to accept additional event types
-without structural changes. In particular, `SipTraceEvent` is defined in the
-event system (Section 4) so that raw SIP message capture can be wired in once
-sipgo's message interception API is validated. The TUI tab structure (Section 5)
-includes placeholder tabs for SIP Trace and SIP Dialogs that will consume these
-events. No MVP code depends on trace data flowing, but no architectural barriers
-prevent it from being added later.
+without structural changes. `SipTraceEvent` is wired end-to-end in MVP — the
+engine emits trace events via sipgo's `SIPTracer` interface and the TUI SIP
+Trace tab displays them in real time. The SIP Dialogs tab remains a placeholder
+for the Phase 2 sngrep-style dialog viewer, which will consume the same trace
+events through a `DialogTracker`.
 
 ---
 
@@ -163,23 +165,29 @@ goroutine (coordinated via a channel on the `Call` struct).
 | Play WAV | `PlayAudio(callID, path)` | `dialog.PlaybackCreate(); pb.PlayFile(path)` |
 | Record | `Record(callID, path)` | `dialog.AudioStereoRecordingCreate(file)` |
 
-### SIP trace capture (deferred — not MVP)
+### SIP trace capture (MVP — validated in Phase 0 spike)
 
-SIP trace capture is deferred until the Phase 0 feasibility spike validates
-sipgo's message interception API. The planned approach is:
+SIP trace capture is included in MVP. The Phase 0 spike validated sipgo's
+`SIPTracer` interface as a first-class interception API (not a debug log
+scraper). The approach:
 
-1. Hook into sipgo's message processing layer (not just debug logging) to
-   intercept raw SIP messages with direction and timestamps.
+1. Implement sipgo's `sip.SIPTracer` interface to intercept raw SIP messages
+   with direction, transport, addresses, and timestamps.
 2. Wrap intercepted messages as `SipTraceEvent` and push onto the events channel.
-3. Feed events to a `DialogTracker` (Section 4) for the sngrep-style viewer.
+3. The TUI SIP Trace tab displays messages in real time (scrolling text view).
+4. Feed events to a `DialogTracker` (Section 4) for the sngrep-style viewer
+   in Phase 2.
 
-**Hook point:** The `Engine` struct's `events` channel already supports
-`SipTraceEvent` as a defined event type. When trace capture is implemented, no
-changes to the TUI event loop, channel, or engine API are required — only the
-sipgo interception code needs to be written and wired in.
+**Hook point:** sipgo's `sip.SIPDebugTracer()` accepts a tracer implementation:
 
-**MVP workaround:** Engineers can run `sngrep` in a separate terminal for SIP
-trace visibility during early phases.
+```go
+sip.SIPDebug = true
+sip.SIPDebugTracer(&engineTracer{events: engine.events})
+```
+
+Each `SIPTraceRead`/`SIPTraceWrite` callback receives the full raw SIP message
+as `[]byte` plus transport metadata — sufficient for the trace log panel and
+future dialog tracking.
 
 ---
 
@@ -220,10 +228,10 @@ type DTMFEvent struct {
 }
 ```
 
-> **MVP note:** `SipTraceEvent` and `DTMFEvent` are defined in the event system
-> from day 1 so the channel and switch statement are ready. In MVP, no code
-> emits `SipTraceEvent` — it is activated when trace capture is implemented
-> post-Phase 0 spike. `DTMFEvent` is wired in MVP for received DTMF display.
+> **MVP note:** All four event types are wired end-to-end in MVP.
+> `SipTraceEvent` is emitted by the engine's `SIPTracer` implementation and
+> consumed by the TUI SIP Trace tab. `DTMFEvent` is wired for received DTMF
+> display.
 
 ### TUI event loop
 
@@ -239,10 +247,8 @@ go func() {
             callTable.Update(e) // updates call table, not single-call display
         case DTMFEvent:
             callTable.ShowDTMF(e)
-        // SipTraceEvent handling — wired post-Phase 0 spike:
-        // case SipTraceEvent:
-        //     traceLog.Append(e)
-        //     dialogTracker.Ingest(e)
+        case SipTraceEvent:
+            traceLog.Append(e)
         }
         app.QueueUpdateDraw(func() {})
     }
@@ -310,7 +316,7 @@ tabbed bottom section.
 │ 15:04:01 INVITE sip:100@pbx.io → 100 Trying                        │
 │ 15:04:01 INVITE sip:100@pbx.io → 180 Ringing                       │
 │ 15:04:03 INVITE sip:100@pbx.io → 200 OK                            │
-│ (SIP Trace and SIP Dialogs tabs are placeholders — not active in MVP)│
+│ (SIP Dialogs tab is a placeholder — not active in MVP)               │
 ├──────────────────────────────────────────────────────────────────────┤
 │ [d]Dial [a]Ans [h]Hang [x]Xfer [m]Mute [p]DTMF [Tab]Panels        │
 └──────────────────────────────────────────────────────────────────────┘
@@ -328,7 +334,7 @@ tabbed bottom section.
 | BLF panel | `Table` with colored rows | Columns: Extension, Name, State. Placeholder data in MVP — wired to SUBSCRIBE/NOTIFY in Phase 2. Colored state indicators: idle=green, busy=red, ringing=yellow, offline=grey. |
 | Bottom tabs | `Pages` (switched by Tab key) | Three pages: Calls, SIP Trace, SIP Dialogs |
 | Calls tab | `Table` — call event log | Summary of call events (not raw SIP) |
-| SIP Trace tab | `TextView` (append-only, scrolling) | **Placeholder in MVP** — shows "Run sngrep for SIP traces" until trace capture is wired |
+| SIP Trace tab | `TextView` (append-only, scrolling) | **Active in MVP** — real-time display of raw SIP messages via sipgo `SIPTracer` |
 | SIP Dialogs tab | `TextView` | **Placeholder in MVP** — shows "SIP dialog viewer available in a future release" |
 | Key hints | `TextView` anchored to bottom row | |
 
@@ -645,7 +651,7 @@ capture and the dialog viewer are explicitly excluded from MVP.
 | Hangup | diago `Hangup()` | |
 | Send DTMF (RFC 4733) | diago `AudioWriterDTMF()` | Validated in spike |
 | Receive DTMF | diago `AudioReaderDTMF()` | |
-| Mute/unmute | diago `PlaybackControl.Mute()` | Validated in spike |
+| SIP trace log panel | sipgo `SIPTracer` API | Validated in spike; real-time raw SIP display |
 | Blind transfer (REFER) | diago `Refer()` | |
 | File audio — play WAV into call | diago `PlaybackCreate()` | Validated in spike |
 | File audio — record from call | diago `AudioStereoRecordingCreate()` | |
@@ -654,22 +660,22 @@ capture and the dialog viewer are explicitly excluded from MVP.
 | Custom SIP headers (config-level) | sipgo header access | |
 | TUI with multi-call table | tview `Table` | UI supports N calls; engine may limit to 1 active |
 | TUI with BLF placeholder panel | tview `Table` | Columns ready; no backend subscription yet |
-| TUI with deferred tab placeholders | tview `Pages` | SIP Trace + SIP Dialogs tabs visible but inactive |
+| TUI with SIP Trace tab (active) | tview `Pages` | Real-time SIP message display; SIP Dialogs tab placeholder |
 | Single-binary cross-platform builds | `go build`, CGO_ENABLED=0 | |
 | G.711 ulaw/alaw codecs | diago built-in, pure Go | |
 
-**Deferred from MVP (promotable now that trace capture is validated):**
-- SIP trace log panel — sipgo `SIPTracer` API validated in spike; can be added
-  to MVP with minimal effort (event wiring + TUI panel)
-- SIP dialog viewer (sngrep-style) — depends on trace panel; remains P2 scope
-  due to UI complexity (ladder diagrams, dialog tracking)
+**Deferred from MVP to Phase 2:**
+- Mute/unmute — diago `PlaybackControl.Mute()` validated in spike; not needed
+  in MVP because null/canned audio mode doesn't benefit from mute control
+- SIP dialog viewer (sngrep-style) — depends on trace capture (now in MVP);
+  remains P2 scope due to UI complexity (ladder diagrams, dialog tracking)
 
 ### Phase 2 — Standard (Desk phone parity + SIP trace)
 
 | Feature | Reason deferred | Custom work required |
 |---|---|---|
-| SIP trace capture | Validated in spike; promotable to MVP | sipgo `SIPTracer` API — no custom interception needed |
-| SIP dialog viewer | UI complexity (ladder diagrams) | `internal/trace/` package + TUI rendering |
+| Mute/unmute | Not needed with null/canned audio in MVP | diago `PlaybackControl.Mute()` — spike validated |
+| SIP dialog viewer | UI complexity (ladder diagrams) | `internal/trace/` package + TUI rendering; trace capture in MVP |
 | Hold/resume | No diago API | re-INVITE with SDP direction |
 | BLF subscriptions (RFC 4235) | No diago SUBSCRIBE/NOTIFY | SUBSCRIBE/NOTIFY transaction support |
 | MWI (RFC 3842) | SUBSCRIBE/NOTIFY pattern | Same as BLF |
@@ -715,10 +721,10 @@ provide and what requires custom implementation.
 | Outbound / inbound calls | MVP | diago `Invite()` / `Serve()` — spike validated |
 | Hangup | MVP | diago `Hangup()` — spike validated |
 | Call hold / resume | P2 + Custom | Needs re-INVITE with SDP direction |
-| Mute / unmute | MVP | diago `PlaybackControlCreate().Mute()` — spike validated |
+| Mute / unmute | P2 | diago `PlaybackControlCreate().Mute()` — spike validated; deferred (not needed with null/canned audio) |
 | Send DTMF | MVP | diago `AudioWriterDTMF().WriteDTMF()` — spike validated |
 | Receive DTMF | MVP | diago `AudioReaderDTMF()` — not spike-tested but same API surface |
-| SIP trace display | P2 | sipgo `SIPTracer` interface validated in spike; promotable to MVP |
+| SIP trace display | MVP | sipgo `SIPTracer` interface validated in spike; promoted to MVP |
 | SIP dialog viewer | P2 | Depends on trace capture — now validated, no risk |
 | File audio play/record | MVP | diago `PlaybackCreate().PlayFile()` — spike validated |
 | Null audio mode | MVP | No media reader/writer |
@@ -743,8 +749,9 @@ provide and what requires custom implementation.
 | Browser audio | Dropped | Terminal-first tool; not a priority |
 
 **Key changes from the reviewer's original table:**
-- SIP trace display and dialog viewer moved from MVP to P2 (per user decision)
+- SIP trace display promoted to MVP (sipgo `SIPTracer` validated in spike)
+- Mute/unmute demoted from MVP to P2 (not needed with null/canned audio)
+- SIP dialog viewer remains P2 (UI complexity; trace capture now in MVP)
 - Multiple simultaneous calls split into UI (MVP) and engine (P2)
 - Runtime header editor moved from P3 to P2 (aligns with desk phone parity)
 - All "(risk)" items de-risked by Phase 0 spike (completed 2026-02-10)
-- SIP trace capture validated — promotable to MVP if desired
