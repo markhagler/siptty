@@ -75,6 +75,13 @@ This guide helps future coding assistants produce Go code that is readable, idio
   - Media/session setup and teardown
 - Favor readable integration-style tests for call flows and protocol behavior.
 
+## tview TUI Pitfalls (Lessons Learned)
+- **`tview.Table` infinite loop**: `SetSelectable(true, ...)` with zero selectable cells causes `Table.InputHandler.forward()` to spin forever. Start tables with `SetSelectable(false, false)` and enable only when data rows exist.
+- **All tview draw calls block**: `QueueUpdateDraw`, `QueueUpdate`, and `Draw` all block the calling goroutine until the main loop processes them. Never call these from a high-frequency event path.
+- **Buffer + debounce for fast events**: For high-volume updates (SIP trace, logs), buffer into a `strings.Builder` with a mutex and flush on a 50ms timer via a single `QueueUpdateDraw`. This keeps the event-reading goroutine free-running.
+- **Profile before guessing**: Use `-debug` flag with `net/http/pprof` on `:6060` to get CPU profiles and goroutine dumps. The real bottleneck is often not where you think — our 100% CPU was a tview bug, not SIP event throughput.
+- **Read library source on blocking semantics**: tview docs say `Draw()` is "thread-safe" but don't mention it blocks. Always check the actual implementation of third-party APIs for hidden synchronization.
+
 ## Non-Goals
 - Do not introduce heavy architectural patterns unless justified by complexity.
 - Do not over-generalize early; keep APIs practical and incremental.
